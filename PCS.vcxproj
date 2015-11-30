@@ -67,10 +67,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="file.cpp" />
+    <ClCompile Include="init.cpp" />
+    <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="manager.cpp" />
+    <ClCompile Include="mapreduce.cpp" />
     <ClCompile Include="node.cpp" />
     <ClCompile Include="rack.cpp" />
+    <ClCompile Include="report.cpp" />
     <ClCompile Include="setup.cpp" />
+    <ClCompile Include="workload.cpp" />
     <ClCompile Include="zipf.cpp" />
   </ItemGroup>
   <ItemGroup>

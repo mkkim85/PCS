@@ -6,6 +6,7 @@ std::map<long, file_t*> FILE_MAP;
 std::vector<file_t*> FILE_VEC[CS_RACK_NUM];
 
 extern long SETUP_FILE_BLOCKS;
+extern node_t NODES[NODE_NUM];
 
 void gen_file(void)
 {
@@ -24,17 +25,22 @@ void gen_file(void)
 		{
 			b = &BLOCK_ARR[MAX_BLOCK_ID];
 			b->id = MAX_BLOCK_ID;
+			b->file_id = f->id;
 
 			min = rack * NODE_NUM_IN_RACK;
 			max = min + NODE_NUM_IN_RACK - 1;
 
 			node = uniform_int(min, max);
 			b->locations.push_back(node);
+			++NODES[node].space.used;
+			++NODES[node].space.disk.used;
 
 			for (j = 1; j < REPLICATION_FACTOR; ++j)
 			{
 				node = node + CS_NODE_NUM;
 				b->locations.push_back(node);
+				++NODES[node].space.used;
+				++NODES[node].space.disk.used;
 			}
 
 			f->map_splits.push_back(b);

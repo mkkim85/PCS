@@ -1,4 +1,5 @@
 // simulation parameters
+#define LOGGING					true
 #define REPLICATION_FACTOR		3
 #define MAP_COMPUTATION_TIME	100.0
 #define JOB_MAP_TASK_NUM		1024
@@ -20,10 +21,20 @@
 #define DISK_SPEED				0.64		// 0.64 s/block, 100 MB/s
 #define MAP_SLOTS				8			// HP(Xeon)
 #define MAP_SLOTS_MAX			(NODE_NUM * MAP_SLOTS)
+#define CPU_CORE				(MAP_SLOTS)
 
 // rack
 #define RACK_NUM				60
 #define CS_RACK_NUM				(RACK_NUM / REPLICATION_FACTOR)
 #define NODE_NUM_IN_RACK		(NODE_NUM / RACK_NUM)
+#define SWTICH_NUM				(NODE_NUM_IN_RACK)
 #define RACK_POWER				5940.0		// 5.94 kW
 #define SWITCH_SPEED			0.05		// 0.05 s/block, 10 Gbps, 1.25 GB/s
+
+// setup
+#define MAX_PROCESSES			(MAP_SLOTS_MAX + 5)
+#define MAX_FACILITIES			((NODE_NUM * 3) + RACK_NUM + 1)
+#define MAX_SERVERS				((NODE_NUM * 3) + (NODE_NUM * CPU_CORE) + (RACK_NUM * SWTICH_NUM) + 1)
+#define MAX_MAILBOXES			(MAP_SLOTS_MAX)
+#define MAX_MESSAGES			(MAX_MAILBOXES)
+#define MAX_EVENTS				(MAX_SERVERS * 2)
