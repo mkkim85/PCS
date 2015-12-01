@@ -1,14 +1,17 @@
 #include "header.h"
 
 extern facility *F_MASTER_SWITCH;
+extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
 extern long SETUP_RANDOM_SEED;
 
 void init(void)
 {
 	char str[50];
 	long i;
+	FILE *f = fopen("out.txt", "w");
 
 	reset_prob(SETUP_RANDOM_SEED);
+	set_output_file(f);
 
 	i = max_processes(MAX_PROCESSES);
 	i = max_facilities(MAX_FACILITIES);
@@ -25,6 +28,16 @@ void init(void)
 	sprintf(str, "mSwitch");
 	F_MASTER_SWITCH = new facility(str);
 	F_MASTER_SWITCH->set_servicefunc(inf_srv);
+
+	extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
+
+	T_TURNAROUND_TIME = new table("turnaround time");
+	T_QDELAY_TIME = new table("qdelay time");
+	T_TASK_TIMES[O_CPU] = new table("overhead: cpu");
+	T_TASK_TIMES[O_MEMORY] = new table("overhead: memory");
+	T_TASK_TIMES[O_DISK] = new table("overhead: disk");
+	T_TASK_TIMES[O_NETWORK] = new table("overhead: network");
+	T_TASK_TIMES[O_QDELAY] = new table("overhead: qdelay");
 
 	if (LOGGING)
 	{

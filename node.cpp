@@ -13,6 +13,7 @@ extern facility_ms *FM_CPU[NODE_NUM];
 extern mailbox *M_MAPPER[MAP_SLOTS_MAX];
 extern long REPORT_NODE_STATE_COUNT[STATE_LENGTH];
 extern long MANAGER_MAP_SLOT_CAPACITY;
+extern std::vector<long> HEARTBEAT;
 
 void init_node(void)
 {
@@ -55,6 +56,7 @@ void init_node(void)
 			rack->active_node_set.push_back(node);
 			ACTIVE_NODE_SET.push_back(node);
 			MANAGER_MAP_SLOT_CAPACITY += MAP_SLOTS;
+			HEARTBEAT.push_back(i);
 		}
 		else {
 			node->state = STATE_STANDBY;
@@ -75,6 +77,32 @@ void init_node(void)
 		sprintf(str, "disk%ld", i);
 		F_DISK[i] = new facility(str);
 	}
+}
+
+bool cache_hit(long nid, long bid)
+{
+	std::list<long> *mem = &MEMORY[nid];
+
+	if (find(mem->begin(), mem->end(), bid) == mem->end())
+	{
+		if (LOGGING)
+		{
+			char log[BUFSIZ];
+			sprintf(log, "%ld	<cache_hit>	node: %ld, b: %ld hit failed\n", (long)clock, nid, bid);
+			logging(log);
+		}
+
+		return false;
+	}
+
+	if (LOGGING)
+	{
+		char log[BUFSIZ];
+		sprintf(log, "%ld	<cache_hit>	node: %ld, b: %ld hit success\n", (long)clock, nid, bid);
+		logging(log);
+	}
+
+	return true;
 }
 
 void mem_caching(long nid, long bid)
@@ -107,12 +135,53 @@ void mem_caching(long nid, long bid)
 			mem->pop_back();
 		}
 	}
-	MEMORY[bid].push_front(bid);
+	MEMORY[nid].push_front(bid);
 
 	if (LOGGING)
 	{
 		char log[BUFSIZ];
 		sprintf(log, "%ld	<mem_caching>	node: %ld, b: %ld cached\n", (long)clock, nid, bid);
+		logging(log);
+	}
+}
+
+void node_cpu(long id)
+{
+	double btime = clock;
+	FM_CPU[id]->use(MAP_COMPUTATION_TIME);
+
+	if (LOGGING)
+	{
+		char log[BUFSIZ];
+		sprintf(log, "%ld	<node_cpu>	node: %ld, %lf sec\n", (long)clock, id, (double)clock - btime);
+		logging(log);
+	}
+}
+
+void node_mem(long id, long n)
+{
+	double btime = clock;
+	double t = MEMORY_SPEED * n;
+	F_MEMORY[id]->use(t);
+
+	if (LOGGING)
+	{
+		char log[BUFSIZ];
+		sprintf(log, "%ld	<node_mem>	node: %ld, %ld blk: %lf sec\n", (long)clock, id, n, (double)clock - btime);
+		logging(log);
+	}
+}
+
+void node_disk(long id, long n)
+{
+	double btime = clock;
+	double t = DISK_SPEED * n;
+	F_DISK[id]->use(t);
+
+	if (LOGGING)
+	{
+		char log[BUFSIZ];
+		sprintf(log, "%ld	<node_disk>	node: %ld, %ld blk: %lf sec\n", (long)clock, id, n, (double)clock - btime);
 		logging(log);
 	}
 }

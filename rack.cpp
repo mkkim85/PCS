@@ -85,7 +85,7 @@ void turnoff_rack(long id)
 	}
 }
 
-void swtich_rack(long from, long to, long n)
+void switch_rack(long from, long to, long n)
 {
 	double t = SWITCH_SPEED * n;
 	if (from != to)

@@ -32,4 +32,5 @@ long rand_zipf(void)
 			return i;
 		}
 	}
+	return CS_RACK_NUM;
 }

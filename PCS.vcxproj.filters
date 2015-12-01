@@ -51,6 +51,9 @@
     <ClCompile Include="mapreduce.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="scheduler.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="header.h">

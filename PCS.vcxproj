@@ -50,6 +50,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>odbc32.lib;odbccp32.lib;csim20\lib\deblib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Console</SubSystem>
+      <StackReserveSize>
+      </StackReserveSize>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -75,6 +77,7 @@
     <ClCompile Include="node.cpp" />
     <ClCompile Include="rack.cpp" />
     <ClCompile Include="report.cpp" />
+    <ClCompile Include="scheduler.cpp" />
     <ClCompile Include="setup.cpp" />
     <ClCompile Include="workload.cpp" />
     <ClCompile Include="zipf.cpp" />

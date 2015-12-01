@@ -18,6 +18,7 @@ void gen_file(void)
 	{
 		f = new file_t;
 		f->id = MAX_FILE_ID;
+		f->acc = 0;
 
 		rack = MAX_FILE_ID % CS_RACK_NUM;
 
@@ -31,14 +32,16 @@ void gen_file(void)
 			max = min + NODE_NUM_IN_RACK - 1;
 
 			node = uniform_int(min, max);
-			b->locations.push_back(node);
+			b->local_node.push_back(node);
+			b->local_rack.push_back(GET_RACK_FROM_NODE(node));
 			++NODES[node].space.used;
 			++NODES[node].space.disk.used;
 
 			for (j = 1; j < REPLICATION_FACTOR; ++j)
 			{
 				node = node + CS_NODE_NUM;
-				b->locations.push_back(node);
+				b->local_node.push_back(node);
+				b->local_rack.push_back(GET_RACK_FROM_NODE(node));
 				++NODES[node].space.used;
 				++NODES[node].space.disk.used;
 			}

@@ -1,5 +1,5 @@
 // simulation parameters
-#define LOGGING					true
+#define LOGGING					false
 #define REPLICATION_FACTOR		3
 #define MAP_COMPUTATION_TIME	100.0
 #define JOB_MAP_TASK_NUM		1024
@@ -15,13 +15,14 @@
 #define NODE_P_POWER			315.0		// PEAK
 #define NODE_U_TIME				100.0		// ACTIVATING TIME (sec)
 #define NODE_D_TIME				11.0		// DEACTIVATING TIME (sec)
-#define MEMORY_SIZE				64			// 4 GB, 64 blocks
+#define MEMORY_SIZE				128			// 8 GB, 128 blocks
 #define MEMORY_SPEED			0.003		// 0.003 s/block, PC4-17000, 17,000 MB/s
 #define DISK_SIZE				4000		// 250 GB, 4,000 blocks
 #define DISK_SPEED				0.64		// 0.64 s/block, 100 MB/s
 #define MAP_SLOTS				8			// HP(Xeon)
 #define MAP_SLOTS_MAX			(NODE_NUM * MAP_SLOTS)
 #define CPU_CORE				(MAP_SLOTS)
+#define HEARTBEAT_PERIOD		1
 
 // rack
 #define RACK_NUM				60
@@ -38,3 +39,10 @@
 #define MAX_MAILBOXES			(MAP_SLOTS_MAX)
 #define MAX_MESSAGES			(MAX_MAILBOXES)
 #define MAX_EVENTS				(MAX_SERVERS * 2)
+
+#define NAN						-1
+
+#define GET_NODE_FROM_MAPPER(N)	((N < MAP_SLOTS) ? (0) : (N / MAP_SLOTS))
+#define GET_RACK_FROM_NODE(N)	((N < NODE_NUM_IN_RACK) ? (0) : (N / NODE_NUM_IN_RACK))
+#define GET_G_FROM_NODE(N)		((N < CS_NODE_NUM) ? (0) : (N / CS_NODE_NUM))
+#define GET_G_FROM_RACK(N)		((N < CS_RACK_NUM) ? (0) : (N / CS_RACK_NUM))
