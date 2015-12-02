@@ -58,7 +58,6 @@ void workload(void)
 			CSIM_END = true;
 		}
 
-		hold(10.0);
-		//hold(60.0);
+		hold(60.0);
 	}
 }

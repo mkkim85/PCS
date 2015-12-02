@@ -11,6 +11,7 @@ extern double SETUP_BUDGET_RATIO;
 extern facility *F_DISK[NODE_NUM], *F_MEMORY[NODE_NUM];
 extern facility_ms *FM_CPU[NODE_NUM];
 extern mailbox *M_MAPPER[MAP_SLOTS_MAX];
+extern table *T_CACHE_HIT, *T_CACHE_MISS;
 extern long REPORT_NODE_STATE_COUNT[STATE_LENGTH];
 extern long MANAGER_MAP_SLOT_CAPACITY;
 extern std::vector<long> HEARTBEAT;
@@ -91,7 +92,7 @@ bool cache_hit(long nid, long bid)
 			sprintf(log, "%ld	<cache_hit>	node: %ld, b: %ld hit failed\n", (long)clock, nid, bid);
 			logging(log);
 		}
-
+		T_CACHE_MISS->record(1.0);
 		return false;
 	}
 
@@ -101,7 +102,7 @@ bool cache_hit(long nid, long bid)
 		sprintf(log, "%ld	<cache_hit>	node: %ld, b: %ld hit success\n", (long)clock, nid, bid);
 		logging(log);
 	}
-
+	T_CACHE_HIT->record(1.0);
 	return true;
 }
 

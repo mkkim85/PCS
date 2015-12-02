@@ -2,6 +2,8 @@
 
 extern facility *F_MASTER_SWITCH;
 extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
+extern table *T_LOCALITY[LOCAL_LENGTH];
+extern table *T_CACHE_HIT, *T_CACHE_MISS;
 extern long SETUP_RANDOM_SEED;
 
 void init(void)
@@ -38,6 +40,13 @@ void init(void)
 	T_TASK_TIMES[O_DISK] = new table("overhead: disk");
 	T_TASK_TIMES[O_NETWORK] = new table("overhead: network");
 	T_TASK_TIMES[O_QDELAY] = new table("overhead: qdelay");
+
+	T_LOCALITY[LOCAL_NODE] = new table ("locality: local");
+	T_LOCALITY[LOCAL_RACK] = new table ("locality: rack-local");
+	T_LOCALITY[LOCAL_REMOTE] = new table ("locality: remote");
+
+	T_CACHE_HIT = new table("cache hit");
+	T_CACHE_MISS = new table("cache miss");
 
 	if (LOGGING)
 	{

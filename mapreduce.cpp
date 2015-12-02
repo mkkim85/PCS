@@ -11,6 +11,7 @@ extern std::list<job_t*> MAP_QUEUE;
 extern std::map<long, file_t*> FILE_MAP;
 extern long REPORT_NODE_STATE_COUNT[STATE_LENGTH];
 extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
+extern table *T_LOCALITY[LOCAL_LENGTH];
 extern long SETUP_MODE_TYPE;
 
 void job_tracker(void)
@@ -154,7 +155,7 @@ void mapper(long id)
 			NODES[node].state = STATE_IDLE;
 			++REPORT_NODE_STATE_COUNT[NODES[node].state];
 		}
-		if (NODES[node].mapper.used + 1 == NODES[node].mapper.used)
+		if (NODES[node].mapper.used + 1 == NODES[node].mapper.capacity)
 		{
 			HEARTBEAT.push_back(node);
 		}
@@ -169,6 +170,7 @@ void mapper(long id)
 			T_TURNAROUND_TIME->record(abs(job->time.end - job->time.begin));
 			T_QDELAY_TIME->record(job->time.qtotal);
 		}
+		T_LOCALITY[locality]->record(1.0);
 		
 		delete r;
 	}
