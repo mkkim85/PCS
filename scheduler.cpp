@@ -43,7 +43,7 @@ msg_t* scheduler(long node)
 		for (i = 0, biter = job->map_splits.begin(); biter != job->map_splits.end(); ++biter, ++i)
 		{
 			block = *biter;
-			if (find(block->local_node.begin(), block->local_node.end(), node) != block->local_node.end())
+			if (block->local_node.find(node) != block->local_node.end())
 			{
 				locality = LOCAL_NODE;
 				msg->task.split_index = i;
@@ -52,18 +52,19 @@ msg_t* scheduler(long node)
 				return msg;
 			}
 			else if ((locality == LOCAL_REMOTE || locality == LOCAL_LENGTH)
-				&& find(block->local_rack.begin(), block->local_rack.end(), rack) != block->local_rack.end())
+				&& block->local_rack.find(rack) != block->local_rack.end())
 			{
-				std::vector<long>::iterator iter;
+				std::map<long, node_t*>::iterator iter;
 				for (iter = block->local_node.begin(); iter != block->local_node.end(); ++iter)
 				{
-					if (GET_RACK_FROM_NODE(*iter) == rack &&
-						(NODES[*iter].state == STATE_IDLE || NODES[*iter].state == STATE_PEAK))
+					long tnid = iter->second->id;
+					if (GET_RACK_FROM_NODE(tnid) == rack &&
+						(NODES[tnid].state == STATE_IDLE || NODES[tnid].state == STATE_PEAK))
 					{
 						locality = LOCAL_RACK;
 						msg->task.split_index = i;
 						msg->task.locality = locality;
-						msg->task.local_node = *iter;
+						msg->task.local_node = tnid;
 					}
 				}
 			}
@@ -71,7 +72,12 @@ msg_t* scheduler(long node)
 			{
 				do {
 					select = uniform_int(0, REPLICATION_FACTOR - 1);
-					nptr = &NODES[block->local_node.at(select)];
+					std::map<long, node_t*>::iterator iter = block->local_node.begin();
+					for (long cnt = 0; cnt < select; ++cnt)
+					{
+						++iter;
+					}
+					nptr = iter->second;
 				} while (nptr->state == STATE_STANDBY || nptr->state == STATE_ACTIVATE || nptr->state == STATE_DEACTIVATE);
 				locality = LOCAL_REMOTE;
 				msg->task.split_index = i;

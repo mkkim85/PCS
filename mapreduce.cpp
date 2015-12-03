@@ -90,7 +90,7 @@ void mapper(long id)
 			MAP_QUEUE.remove(job);
 		}
 		file = FILE_MAP[block->file_id];
-		++file->acc;
+		++file->acc[file->id];
 		if (NODES[node].mapper.used++ == 0)
 		{
 			--REPORT_NODE_STATE_COUNT[NODES[node].state];
@@ -126,13 +126,13 @@ void mapper(long id)
 			local_node = r->task.local_node;
 			local_rack = GET_RACK_FROM_NODE(local_node);
 			
-			if (!cache_hit(local_node, block->id))
+			if (cache_hit(local_node, block->id))
 			{
-				node_disk(local_node, 1);
+				node_mem(local_node, 1);
 			}
 			else
 			{
-				node_mem(local_node, 1);
+				node_disk(local_node, 1);				
 			}
 			mem_caching(local_node, block->id);
 			switch_rack(local_rack, rack, 1);
@@ -147,7 +147,10 @@ void mapper(long id)
 
 		mem_caching(node, block->id);
 
-		--file->acc;
+		if (--file->acc[file->id] <= 0)
+		{
+			file->acc.erase(file->id);
+		}
 		MAPPER[id].used = false;
 		if (--NODES[node].mapper.used == 0)
 		{
@@ -171,7 +174,8 @@ void mapper(long id)
 			T_QDELAY_TIME->record(job->time.qtotal);
 		}
 		T_LOCALITY[locality]->record(1.0);
-		
+		--REMAIN_MAP_TASKS;
+
 		delete r;
 	}
 }

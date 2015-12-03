@@ -11,21 +11,6 @@ typedef enum { LOCAL_NODE, LOCAL_RACK, LOCAL_REMOTE, LOCAL_LENGTH } LocalTypes;
 typedef enum { MODE_BASELINE, MODE_SIERRA, MODE_IPACS, MODE_RCS, MODE_PCS, MODE_LENGTH } ModeTypes;
 typedef enum { FAIR_SCHEDULER, DELAY_SCHEDULER, SCHEDULER_LENGTH } SchedulerTypes;
 
-struct block_t
-{
-	long id;
-	long file_id;
-	std::vector<long> local_node, local_rack;
-};
-
-struct file_t
-{
-	long id;
-	long acc;
-	long map_total;
-	std::vector<block_t*> map_splits;
-};
-
 struct slot_t
 {
 	long id;
@@ -62,8 +47,24 @@ struct rack_t
 {
 	long id;
 	StateTypes state;
-	std::vector<node_t*> active_node_set;
-	std::vector<node_t*> standby_node_set;
+	std::map<long, node_t*> active_node_set;
+	std::map<long, node_t*> standby_node_set;
+};
+
+struct block_t
+{
+	long id;
+	long file_id;
+	std::map<long, node_t*> local_node;
+	std::map<long, rack_t*> local_rack;
+};
+
+struct file_t
+{
+	long id;
+	long size;
+	std::vector<block_t*> blocks;
+	std::map<long, long> acc;
 };
 
 struct job_t
@@ -80,6 +81,12 @@ struct job_t
 	} time;
 };
 
+struct covering_t
+{
+	bool covering_set[NODE_NUM];
+	std::map<long, long> *bag;
+};
+
 union msg_t
 {
 	struct {
@@ -89,4 +96,7 @@ union msg_t
 		long split_index;
 		job_t *job;
 	} task;
+	struct {
+		bool power;
+	} power;
 };

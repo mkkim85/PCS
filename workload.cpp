@@ -35,12 +35,13 @@ void workload(void)
 			i = uniform_int(0, max);
 			file = FILE_VEC[n].at(i);
 
-			for (iter = file->map_splits.begin(); iter != file->map_splits.end(); ++iter)
+			for (iter = file->blocks.begin(); iter != file->blocks.end(); ++iter)
 			{
 				job->map_splits.push_back(*iter);
 				++job->map_total;
 			}
 		}
+		REMAIN_MAP_TASKS += job->map_total;
 		JOB_MAP[MAX_JOB_ID] = job;
 		++MAX_JOB_ID;
 		MAP_QUEUE.push_back(job);
@@ -58,6 +59,7 @@ void workload(void)
 			CSIM_END = true;
 		}
 
-		hold(60.0);
+		hold(30);
+		//hold(60.0);
 	}
 }

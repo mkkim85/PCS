@@ -1,11 +1,12 @@
 #include "header.h"
 
 rack_t RACKS[RACK_NUM];
-std::vector<rack_t*> ACTIVE_RACK_SET, STANDBY_RACK_SET;
+std::map<long, rack_t*> ACTIVE_RACK_SET, STANDBY_RACK_SET;
 
 extern facility *F_MASTER_SWITCH;
 extern facility_ms *FM_RACK_SWTICH[RACK_NUM];
 extern long REPORT_RACK_STATE_COUNT[STATE_LENGTH];
+extern long SETUP_MODE_TYPE;
 
 void init_rack(void)
 {
@@ -17,15 +18,15 @@ void init_rack(void)
 	{
 		rack = &RACKS[i];
 		rack->id = i;
-		if (i < CS_RACK_NUM)
+		if (SETUP_MODE_TYPE == MODE_BASELINE || i < CS_RACK_NUM)
 		{
 			rack->state = STATE_ACTIVE;
-			ACTIVE_RACK_SET.push_back(rack);
+			ACTIVE_RACK_SET[i] = rack;
 		}
 		else
 		{
 			rack->state = STATE_STANDBY;
-			STANDBY_RACK_SET.push_back(rack);
+			STANDBY_RACK_SET[i] = rack;
 		}
 
 		sprintf(str, "rSwitch%ld", i);
@@ -48,9 +49,8 @@ void turnon_rack(long id)
 	--REPORT_RACK_STATE_COUNT[rack->state];
 	rack->state = STATE_ACTIVE;
 	++REPORT_RACK_STATE_COUNT[rack->state];
-	ACTIVE_RACK_SET.push_back(rack);
-	finder = find(STANDBY_RACK_SET.begin(), STANDBY_RACK_SET.end(), rack);
-	STANDBY_RACK_SET.erase(finder);
+	ACTIVE_RACK_SET[id] = rack;
+	STANDBY_RACK_SET.erase(id);
 
 	if (LOGGING)
 	{
@@ -73,9 +73,8 @@ void turnoff_rack(long id)
 	--REPORT_RACK_STATE_COUNT[rack->state];
 	rack->state = STATE_STANDBY;
 	++REPORT_RACK_STATE_COUNT[rack->state];
-	STANDBY_RACK_SET.push_back(rack);
-	finder = find(ACTIVE_RACK_SET.begin(), ACTIVE_RACK_SET.end(), rack);
-	ACTIVE_RACK_SET.erase(finder);
+	STANDBY_RACK_SET[id] = rack;
+	ACTIVE_RACK_SET.erase(id);
 
 	if (LOGGING)
 	{

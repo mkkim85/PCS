@@ -3,7 +3,10 @@
 #define REPLICATION_FACTOR		3
 #define MAP_COMPUTATION_TIME	100.0
 #define JOB_MAP_TASK_NUM		1024
-#define DATA_BLOCK_NUM			(32 * 1024)		// 32n, 2TB
+#define DATA_BLOCK_NUM			(16 * 1024)		// 16n, 1TB
+#define TIME_UNIT				1.0
+#define MINUTE					3600.0
+#define HOUR					(60 * MINUTE)
 
 // node
 #define NODE_NUM 				1200
@@ -33,7 +36,7 @@
 #define SWITCH_SPEED			0.05		// 0.05 s/block, 10 Gbps, 1.25 GB/s
 
 // setup
-#define MAX_PROCESSES			(MAP_SLOTS_MAX + 5)
+#define MAX_PROCESSES			(MAP_SLOTS_MAX + 6)
 #define MAX_FACILITIES			((NODE_NUM * 3) + RACK_NUM + 1)
 #define MAX_SERVERS				((NODE_NUM * 3) + (NODE_NUM * CPU_CORE) + (RACK_NUM * SWTICH_NUM) + 1)
 #define MAX_MAILBOXES			(MAP_SLOTS_MAX)

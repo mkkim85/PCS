@@ -16,6 +16,7 @@ extern "C" void sim(void)
 	init();
 	workload();
 	job_tracker();
+	state_manager();
 	sim_report();
 
 	event_list_empty.wait();

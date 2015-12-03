@@ -1,13 +1,14 @@
 #include "header.h"
 
 node_t NODES[NODE_NUM];
-std::vector<node_t*> ACTIVE_NODE_SET, STANDBY_NODE_SET;
+std::map<long, node_t*> ACTIVE_NODE_SET, STANDBY_NODE_SET;
 slot_t MAPPER[MAP_SLOTS_MAX];
 long MAX_MAPPER_ID;
 std::list<long> MEMORY[NODE_NUM];
 
 extern rack_t RACKS[RACK_NUM];
 extern double SETUP_BUDGET_RATIO;
+extern long SETUP_MODE_TYPE;
 extern facility *F_DISK[NODE_NUM], *F_MEMORY[NODE_NUM];
 extern facility_ms *FM_CPU[NODE_NUM];
 extern mailbox *M_MAPPER[MAP_SLOTS_MAX];
@@ -52,17 +53,17 @@ void init_node(void)
 			++MAX_MAPPER_ID;
 		}
 
-		if (i < CS_NODE_NUM) {
+		if (SETUP_MODE_TYPE == MODE_BASELINE || i < CS_NODE_NUM) {
 			node->state = STATE_IDLE;
-			rack->active_node_set.push_back(node);
-			ACTIVE_NODE_SET.push_back(node);
+			rack->active_node_set[i] = node;
+			ACTIVE_NODE_SET[i] = node;
 			MANAGER_MAP_SLOT_CAPACITY += MAP_SLOTS;
 			HEARTBEAT.push_back(i);
 		}
 		else {
 			node->state = STATE_STANDBY;
-			rack->standby_node_set.push_back(node);
-			STANDBY_NODE_SET.push_back(node);
+			rack->standby_node_set[i] = node;
+			STANDBY_NODE_SET[i] = node;
 		}
 		++REPORT_NODE_STATE_COUNT[node->state];
 

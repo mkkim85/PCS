@@ -3,6 +3,8 @@
 
 // file.cpp
 void gen_file(void);
+long GetMaxFileAcc(void);
+long GetTopK(std::list<long> *h);
 
 // init.cpp
 void init(void);
@@ -14,7 +16,12 @@ void logging(char str[]);
 // extern "C" void sim(void)
 
 // manager.cpp
-
+void state_manager(void);
+covering_t* FindSierra(long top_k, long req_m);
+//covering_t* FindiPACS(long top_k, long req_m, std::map<long, long> *bag);
+//covering_t* FindRCS(long top_k, long req_m);
+//covering_t* FindPCS(long top_k, long req_m, std::map<long, long> *bag);
+void ActivateNodes(covering_t *cs);
 
 // mapreduce.cpp
 void job_tracker(void);
