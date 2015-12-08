@@ -3,8 +3,9 @@
 
 // file.cpp
 void gen_file(void);
-long GetMaxFileAcc(void);
-long GetTopK(std::list<long> *h);
+std::map<long, long> GetUnitOfFileAcc(void);
+std::map<long, long>* GetPopularBlockList(long *top_k);
+block_t* GetBlock(long id);
 
 // init.cpp
 void init(void);
@@ -17,11 +18,11 @@ void logging(char str[]);
 
 // manager.cpp
 void state_manager(void);
-covering_t* FindSierra(long top_k, long req_m);
-//covering_t* FindiPACS(long top_k, long req_m, std::map<long, long> *bag);
-//covering_t* FindRCS(long top_k, long req_m);
-//covering_t* FindPCS(long top_k, long req_m, std::map<long, long> *bag);
-void ActivateNodes(covering_t *cs);
+std::map<long, long>* FindSierra(bool cs[], long top_k, long req_m);
+std::map<long, long>* FindiPACS(bool cs[], std::map<long, long> *bag, long top_k, long req_m);
+std::map<long, long>* FindRCS(bool cs[], long req_m);
+std::map<long, long>* FindPCS(bool cs[], std::map<long, long> *bag, long req_m);
+void ActivateNodes(bool cs[], std::map<long, long> *bag);
 
 // mapreduce.cpp
 void job_tracker(void);
@@ -29,6 +30,7 @@ void mapper(long id);
 
 // node.cpp
 void init_node(void);
+void node(long id);
 bool cache_hit(long nid, long bid);
 void mem_caching(long nid, long bid);
 void node_cpu(long id);

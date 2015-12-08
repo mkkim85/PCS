@@ -2,6 +2,7 @@
 
 rack_t RACKS[RACK_NUM];
 std::map<long, rack_t*> ACTIVE_RACK_SET, STANDBY_RACK_SET;
+std::map<long, rack_t*> ACTIVE_RACK_NPG_SET, NPG_SET;
 
 extern facility *F_MASTER_SWITCH;
 extern facility_ms *FM_RACK_SWTICH[RACK_NUM];
@@ -18,6 +19,7 @@ void init_rack(void)
 	{
 		rack = &RACKS[i];
 		rack->id = i;
+		rack->rank = 0;
 		if (SETUP_MODE_TYPE == MODE_BASELINE || i < CS_RACK_NUM)
 		{
 			rack->state = STATE_ACTIVE;
@@ -27,6 +29,7 @@ void init_rack(void)
 		{
 			rack->state = STATE_STANDBY;
 			STANDBY_RACK_SET[i] = rack;
+			NPG_SET[i] = rack;
 		}
 
 		sprintf(str, "rSwitch%ld", i);
@@ -49,8 +52,9 @@ void turnon_rack(long id)
 	--REPORT_RACK_STATE_COUNT[rack->state];
 	rack->state = STATE_ACTIVE;
 	++REPORT_RACK_STATE_COUNT[rack->state];
-	ACTIVE_RACK_SET[id] = rack;
 	STANDBY_RACK_SET.erase(id);
+	ACTIVE_RACK_SET[id] = rack;
+	ACTIVE_RACK_NPG_SET[id] = rack;
 
 	if (LOGGING)
 	{
@@ -73,8 +77,9 @@ void turnoff_rack(long id)
 	--REPORT_RACK_STATE_COUNT[rack->state];
 	rack->state = STATE_STANDBY;
 	++REPORT_RACK_STATE_COUNT[rack->state];
-	STANDBY_RACK_SET[id] = rack;
 	ACTIVE_RACK_SET.erase(id);
+	STANDBY_RACK_SET[id] = rack;
+	ACTIVE_RACK_NPG_SET.erase(id);
 
 	if (LOGGING)
 	{

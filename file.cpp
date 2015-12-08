@@ -8,6 +8,10 @@ std::vector<file_t*> FILE_VEC[CS_RACK_NUM];
 extern long SETUP_FILE_SIZE;
 extern node_t NODES[NODE_NUM];
 extern rack_t RACKS[RACK_NUM];
+extern std::list<std::map<long, long>> FILE_ACC_H;
+extern long SETUP_MODE_TYPE;
+extern std::priority_queue<rack_t, std::vector<rack_t>, rank_cmp> MANAGER_RANK;
+extern long MANAGER_BAG_SIZE;
 
 void gen_file(void)
 {
@@ -60,40 +64,122 @@ void gen_file(void)
 	}
 }
 
-long GetMaxFileAcc(void)
+std::map<long, long> GetUnitOfFileAcc(void)
 {
 	file_t *file;
-	int max = 0;
-	std::map<long, file_t*>::iterator iter;
+	std::map<long, long> h;
+	std::map<long ,file_t*>::iterator iter;
 	for (iter = FILE_MAP.begin(); iter != FILE_MAP.end(); ++iter)
 	{
 		file = iter->second;
-		if (file->acc.size() > max)
+		if (file->acc.size() > 1)
 		{
-			max = file->acc.size();
+			h[file->id] = file->acc.size();
 		}
 	}
-	return max;
+	return h;
 }
 
-long GetTopK(std::list<long> *h)
+
+std::map<long, long>* GetPopularBlockList(long *top_k)
 {
-	int max = INT_MIN;
-	std::list<long>::iterator iter;
-	for (iter = h->begin(); iter != h->end(); ++iter)
+	long req, acc, max = 0;
+	block_t *block;
+	file_t *file;
+	std::list<std::map<long, long>>::iterator hiter;
+	std::map<long, long>::iterator miter;
+	std::vector<block_t*>::iterator biter;
+	std::map<long, long> *bag = new std::map<long, long>;
+
+	if (SETUP_MODE_TYPE == MODE_PCS)
 	{
-		if (*iter > max)
+		MANAGER_BAG_SIZE = 0;
+
+		for (long i = 0; i < RACK_NUM; ++i)
 		{
-			max = *iter;
+			RACKS[i].rank = 0;
 		}
 	}
-	return max;
+
+	for (hiter = FILE_ACC_H.begin(); hiter != FILE_ACC_H.end(); ++hiter)
+	{
+		for (miter = hiter->begin(); miter != hiter->end(); ++miter)
+		{
+			file = FILE_MAP[miter->first];
+			acc = miter->second;
+
+			if (acc > max)
+			{
+				max = acc;
+			}
+
+			req = MIN(acc, REPLICATION_FACTOR) - 1;
+			for (biter = file->blocks.begin(); biter != file->blocks.end(); ++biter)
+			{
+				block = (*biter);
+				if ((*bag).find(block->id) != (*bag).end())
+				{
+					if (SETUP_MODE_TYPE == MODE_PCS)
+					{
+						long prev = (*bag)[block->id];
+						long cnt = req;
+						while (cnt-- > prev)
+						{
+							++MANAGER_BAG_SIZE;
+							std::map<long, rack_t*>::iterator item = block->local_rack.begin(),
+								end = block->local_rack.end();
+
+							while (++item != end)
+							{
+								++item->second->rank;
+							}
+						}
+					}
+					(*bag)[block->id] = MAX(req, (*bag)[block->id]);
+				}
+				else
+				{
+					if (SETUP_MODE_TYPE == MODE_PCS)
+					{
+						long cnt = req;
+						while (cnt-- > 0)
+						{
+							++MANAGER_BAG_SIZE;
+							std::map<long, rack_t*>::iterator item = block->local_rack.begin(),
+								end = block->local_rack.end();
+
+							while (++item != end)
+							{
+								++item->second->rank;
+							}
+						}
+					}
+					(*bag)[block->id] = req;
+				}
+			}
+		}
+	}
+
+	*top_k = max;
+	if (!bag->empty())
+	{
+		if (SETUP_MODE_TYPE == MODE_PCS)
+		{
+			for (long i = CS_RACK_NUM; i < RACK_NUM; ++i)
+			{
+				MANAGER_RANK.push(RACKS[i]);
+			}
+		}
+
+		return bag;
+	}
+
+	delete bag;
+	return NULL;
 }
 
-
-std::list<block_t*> GetPopularBlockList(void)
+block_t* GetBlock(long id)
 {
-	std::list<block_t*> bag;
-
-	return bag;
+	if (id > DATA_BLOCK_NUM) return NULL;
+	return &BLOCK_ARR[id];
 }

@@ -5,15 +5,15 @@ extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
 extern table *T_LOCALITY[LOCAL_LENGTH];
 extern table *T_CACHE_HIT, *T_CACHE_MISS;
 extern long SETUP_RANDOM_SEED;
+extern FILE *SETUP_SIM_OUTPUT;
 
 void init(void)
 {
 	char str[50];
 	long i;
-	FILE *f = fopen("out.txt", "w");
-
+	
 	reset_prob(SETUP_RANDOM_SEED);
-	set_output_file(f);
+	set_output_file(SETUP_SIM_OUTPUT);
 
 	i = max_processes(MAX_PROCESSES);
 	i = max_facilities(MAX_FACILITIES);

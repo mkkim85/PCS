@@ -3,6 +3,8 @@
 #include <list>
 #include <map>
 #include <algorithm>
+#include <queue>
+#include <sys/stat.h>
 #include "cpp.h"
 
 typedef enum { STATE_ACTIVATE, STATE_DEACTIVATE, STATE_STANDBY, STATE_IDLE, STATE_PEAK, STATE_ACTIVE, STATE_LENGTH } StateTypes;
@@ -46,6 +48,7 @@ struct node_t
 struct rack_t
 {
 	long id;
+	long rank;
 	StateTypes state;
 	std::map<long, node_t*> active_node_set;
 	std::map<long, node_t*> standby_node_set;
@@ -81,12 +84,6 @@ struct job_t
 	} time;
 };
 
-struct covering_t
-{
-	bool covering_set[NODE_NUM];
-	std::map<long, long> *bag;
-};
-
 union msg_t
 {
 	struct {
@@ -99,4 +96,11 @@ union msg_t
 	struct {
 		bool power;
 	} power;
+};
+
+struct rank_cmp {
+	bool operator() (rack_t x, rack_t y)
+	{
+		return x.rank < y.rank;
+	}
 };

@@ -5,8 +5,9 @@
 #define JOB_MAP_TASK_NUM		1024
 #define DATA_BLOCK_NUM			(16 * 1024)		// 16n, 1TB
 #define TIME_UNIT				1.0
-#define MINUTE					3600.0
+#define MINUTE					60
 #define HOUR					(60 * MINUTE)
+#define MODE_TRANS_INTERVAL		(5 * MINUTE)
 
 // node
 #define NODE_NUM 				1200
@@ -36,12 +37,12 @@
 #define SWITCH_SPEED			0.05		// 0.05 s/block, 10 Gbps, 1.25 GB/s
 
 // setup
-#define MAX_PROCESSES			(MAP_SLOTS_MAX + 6)
+#define MAX_PROCESSES			(NODE_NUM + MAP_SLOTS_MAX + 6)
 #define MAX_FACILITIES			((NODE_NUM * 3) + RACK_NUM + 1)
 #define MAX_SERVERS				((NODE_NUM * 3) + (NODE_NUM * CPU_CORE) + (RACK_NUM * SWTICH_NUM) + 1)
-#define MAX_MAILBOXES			(MAP_SLOTS_MAX)
+#define MAX_MAILBOXES			(NODE_NUM + MAP_SLOTS_MAX)
 #define MAX_MESSAGES			(MAX_MAILBOXES)
-#define MAX_EVENTS				(MAX_SERVERS * 2)
+#define MAX_EVENTS				((MAX_SERVERS + MAX_MESSAGES) * 2)
 
 #define NAN						-1
 
@@ -49,3 +50,6 @@
 #define GET_RACK_FROM_NODE(N)	((N < NODE_NUM_IN_RACK) ? (0) : (N / NODE_NUM_IN_RACK))
 #define GET_G_FROM_NODE(N)		((N < CS_NODE_NUM) ? (0) : (N / CS_NODE_NUM))
 #define GET_G_FROM_RACK(N)		((N < CS_RACK_NUM) ? (0) : (N / CS_RACK_NUM))
+
+#define MIN(X, Y)				((X < Y) ? (X) : (Y))
+#define MAX(X, Y)				((X > Y) ? (X) : (Y))

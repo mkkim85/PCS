@@ -13,6 +13,8 @@ extern long REPORT_NODE_STATE_COUNT[STATE_LENGTH];
 extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
 extern table *T_LOCALITY[LOCAL_LENGTH];
 extern long SETUP_MODE_TYPE;
+extern bool MANAGER_CS[NODE_NUM];
+extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
 
 void job_tracker(void)
 {
@@ -23,14 +25,14 @@ void job_tracker(void)
 	while (!CSIM_END)
 	{
 		std::vector<long> heartbeat;
-		if (MAP_QUEUE.empty() == false)
+
+		if (MAP_QUEUE.empty() == false && HEARTBEAT.empty() == false)
 		{
 			heartbeat = HEARTBEAT;
 		}
 
 		while (heartbeat.empty() == false && MAP_QUEUE.empty() == false)
 		{
-			// TODO: task tracker
 			i = uniform_int(0, heartbeat.size() - 1);
 			node = heartbeat.at(i);
 			heartbeat.erase(heartbeat.begin() + i);
@@ -70,7 +72,6 @@ void mapper(long id)
 	{
 		M_MAPPER[id]->receive((long*)&r);
 
-		// TODO: map task handler
 		job = r->task.job;
 		locality = r->task.locality;
 		if (job->running++ == 0)
@@ -80,32 +81,33 @@ void mapper(long id)
 			T_TASK_TIMES[O_QDELAY]->record(qdelay);
 		}
 		block = job->map_splits.at(r->task.split_index);
-		if (r->task.split_index < 0 || r->task.split_index >= job->map_splits.size())
-		{ // error check
-			block = block;
-		}
 		job->map_splits.erase(job->map_splits.begin() + r->task.split_index);
 		if (job->map_splits.size() == 0)
 		{
 			MAP_QUEUE.remove(job);
 		}
 		file = FILE_MAP[block->file_id];
-		++file->acc[file->id];
+		++file->acc[job->id];
 		if (NODES[node].mapper.used++ == 0)
 		{
 			--REPORT_NODE_STATE_COUNT[NODES[node].state];
+			if (node < CS_NODE_NUM) --REPORT_NODE_STATE_COUNT_PG[NODES[node].state];
 			NODES[node].state = STATE_PEAK;
+			if (node < CS_NODE_NUM) ++REPORT_NODE_STATE_COUNT_PG[NODES[node].state];
 			++REPORT_NODE_STATE_COUNT[NODES[node].state];
 		}
 		if (NODES[node].mapper.used == NODES[node].mapper.capacity)
 		{
-			HEARTBEAT.erase(find(HEARTBEAT.begin(), HEARTBEAT.end(), node));
+			std::vector<long>::iterator iter = find(HEARTBEAT.begin(), HEARTBEAT.end(), node);
+			if (iter != HEARTBEAT.end())
+			{
+				HEARTBEAT.erase(find(HEARTBEAT.begin(), HEARTBEAT.end(), node));
+			}
 		}
 		MAPPER[id].used = true;
 
 		if (locality == LOCAL_NODE)
 		{
-			// TODO: mem check, disk I/O
 			if (cache_hit(node, block->id))
 			{
 				double mem = clock;
@@ -121,7 +123,6 @@ void mapper(long id)
 		}
 		else
 		{
-			// network
 			double network = clock;
 			local_node = r->task.local_node;
 			local_rack = GET_RACK_FROM_NODE(local_node);
@@ -140,25 +141,27 @@ void mapper(long id)
 			T_TASK_TIMES[O_NETWORK]->record(abs(clock - network));
 		}
 
-		// TODO: computation
 		double cpu = clock;
 		node_cpu(node);
 		T_TASK_TIMES[O_CPU]->record(abs(clock - cpu));
 
 		mem_caching(node, block->id);
 
-		if (--file->acc[file->id] <= 0)
+		if (--file->acc[job->id] <= 0)
 		{
-			file->acc.erase(file->id);
+			file->acc.erase(job->id);
 		}
 		MAPPER[id].used = false;
 		if (--NODES[node].mapper.used == 0)
 		{
 			--REPORT_NODE_STATE_COUNT[NODES[node].state];
+			if (node < CS_NODE_NUM) --REPORT_NODE_STATE_COUNT_PG[NODES[node].state];
 			NODES[node].state = STATE_IDLE;
+			if (node < CS_NODE_NUM) ++REPORT_NODE_STATE_COUNT_PG[NODES[node].state];
 			++REPORT_NODE_STATE_COUNT[NODES[node].state];
 		}
-		if (NODES[node].mapper.used + 1 == NODES[node].mapper.capacity)
+		if ((MANAGER_CS[node] == true)
+			&& (NODES[node].mapper.used + 1 == NODES[node].mapper.capacity))
 		{
 			HEARTBEAT.push_back(node);
 		}
