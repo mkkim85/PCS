@@ -8,7 +8,7 @@ std::vector<file_t*> FILE_VEC[CS_RACK_NUM];
 extern long SETUP_FILE_SIZE;
 extern node_t NODES[NODE_NUM];
 extern rack_t RACKS[RACK_NUM];
-extern std::list<std::map<long, long>> FILE_ACC_H;
+extern std::list<long_map_t> FILE_ACC_H;
 extern long SETUP_MODE_TYPE;
 extern std::priority_queue<rack_t, std::vector<rack_t>, rank_cmp> MANAGER_RANK;
 extern long MANAGER_BAG_SIZE;
@@ -41,6 +41,8 @@ void gen_file(void)
 			b->local_rack[GET_RACK_FROM_NODE(node)] = &RACKS[GET_RACK_FROM_NODE(node)];
 			++NODES[node].space.used;
 			++NODES[node].space.disk.used;
+			NODES[node].space.disk.blocks[b->id] = b;
+			RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = b;
 
 			for (j = 1; j < REPLICATION_FACTOR; ++j)
 			{
@@ -49,6 +51,8 @@ void gen_file(void)
 				b->local_rack[GET_RACK_FROM_NODE(node)] = &RACKS[GET_RACK_FROM_NODE(node)];
 				++NODES[node].space.used;
 				++NODES[node].space.disk.used;
+				NODES[node].space.disk.blocks[b->id] = b;
+				RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = b;
 			}
 
 			f->blocks.push_back(b);
@@ -64,10 +68,10 @@ void gen_file(void)
 	}
 }
 
-std::map<long, long> GetUnitOfFileAcc(void)
+long_map_t GetUnitOfFileAcc(void)
 {
 	file_t *file;
-	std::map<long, long> h;
+	long_map_t h;
 	std::map<long ,file_t*>::iterator iter;
 	for (iter = FILE_MAP.begin(); iter != FILE_MAP.end(); ++iter)
 	{
@@ -81,15 +85,15 @@ std::map<long, long> GetUnitOfFileAcc(void)
 }
 
 
-std::map<long, long>* GetPopularBlockList(long *top_k)
+long_map_t* GetPopularBlockList(long *top_k)
 {
 	long req, acc, max = 0;
 	block_t *block;
 	file_t *file;
-	std::list<std::map<long, long>>::iterator hiter;
-	std::map<long, long>::iterator miter;
+	std::list<long_map_t>::iterator hiter;
+	long_map_t::iterator miter;
 	std::vector<block_t*>::iterator biter;
-	std::map<long, long> *bag = new std::map<long, long>;
+	long_map_t *bag = new long_map_t;
 
 	if (SETUP_MODE_TYPE == MODE_PCS)
 	{
@@ -126,7 +130,7 @@ std::map<long, long>* GetPopularBlockList(long *top_k)
 						while (cnt-- > prev)
 						{
 							++MANAGER_BAG_SIZE;
-							std::map<long, rack_t*>::iterator item = block->local_rack.begin(),
+							rack_map_t::iterator item = block->local_rack.begin(),
 								end = block->local_rack.end();
 
 							while (++item != end)
@@ -145,7 +149,7 @@ std::map<long, long>* GetPopularBlockList(long *top_k)
 						while (cnt-- > 0)
 						{
 							++MANAGER_BAG_SIZE;
-							std::map<long, rack_t*>::iterator item = block->local_rack.begin(),
+							rack_map_t::iterator item = block->local_rack.begin(),
 								end = block->local_rack.end();
 
 							while (++item != end)

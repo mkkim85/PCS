@@ -1,7 +1,7 @@
 #include "header.h"
 
 node_t NODES[NODE_NUM];
-std::map<long, node_t*> ACTIVE_NODE_SET, STANDBY_NODE_SET;
+node_map_t ACTIVE_NODE_SET, STANDBY_NODE_SET;
 slot_t MAPPER[MAP_SLOTS_MAX];
 long MAX_MAPPER_ID;
 std::list<long> MEMORY[NODE_NUM];
@@ -40,6 +40,8 @@ void init_node(void)
 		pnode->space.disk.used = 0;
 		pnode->space.budget.capacity = DISK_SIZE * SETUP_BUDGET_RATIO; 
 		pnode->space.budget.used = 0;
+		pnode->space.disk.blocks.clear();
+		pnode->space.budget.blocks.clear();
 
 		sprintf(str, "nMail%ld", i);
 		M_NODE[i] = new mailbox(str);

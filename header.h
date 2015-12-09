@@ -3,9 +3,9 @@
 
 // file.cpp
 void gen_file(void);
-std::map<long, long> GetUnitOfFileAcc(void);
-std::map<long, long>* GetPopularBlockList(long *top_k);
-block_t* GetBlock(long id);
+long_map_t GetUnitOfFileAcc(void);
+long_map_t * GetPopularBlockList(long *top_k);
+block_t * GetBlock(long id);
 
 // init.cpp
 void init(void);
@@ -18,11 +18,11 @@ void logging(char str[]);
 
 // manager.cpp
 void state_manager(void);
-std::map<long, long>* FindSierra(bool cs[], long top_k, long req_m);
-std::map<long, long>* FindiPACS(bool cs[], std::map<long, long> *bag, long top_k, long req_m);
-std::map<long, long>* FindRCS(bool cs[], long req_m);
-std::map<long, long>* FindPCS(bool cs[], std::map<long, long> *bag, long req_m);
-void ActivateNodes(bool cs[], std::map<long, long> *bag);
+long_map_t * FindSierra(bool cs[], long top_k, long req_m);
+long_map_t * FindiPACS(bool cs[], long_map_t *bag, long top_k, long req_m);
+long_map_t * FindRCS(bool cs[], long req_m);
+long_map_t * FindPCS(bool cs[], long_map_t *bag, long req_m);
+void ActivateNodes(bool cs[], long_map_t *bag);
 
 // mapreduce.cpp
 void job_tracker(void);
@@ -48,7 +48,7 @@ void sim_report(void);
 
 // scheduler.cpp
 bool sort_queue(const job_t *l, const job_t *r);
-msg_t* scheduler(long node);
+msg_t * scheduler(long node);
 
 // setup.cpp
 void setup(void);

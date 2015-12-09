@@ -8,8 +8,8 @@ long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
 extern bool CSIM_END;
 extern long SETUP_REPORT_PERIOD;
 extern FILE *SETUP_REPORT_PATH;
-extern std::map<long, node_t*> ACTIVE_NODE_SET, STANDBY_NODE_SET;
-extern std::map<long, rack_t*> ACTIVE_RACK_SET, STANDBY_RACK_SET;
+extern node_map_t ACTIVE_NODE_SET, STANDBY_NODE_SET;
+extern rack_map_t ACTIVE_RACK_SET, STANDBY_RACK_SET;
 
 void sim_report(void)
 {

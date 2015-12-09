@@ -1,6 +1,6 @@
 #include "header.h"
 
-double SETUP_DATA_SKEW = 1.0;
+double SETUP_DATA_SKEW = 0.0;
 double SETUP_BUDGET_RATIO = 0.1;
 double SETUP_ALPHA = 0.3;
 double SETUP_BETA = 0.3;

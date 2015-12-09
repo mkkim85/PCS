@@ -13,6 +13,8 @@ typedef enum { LOCAL_NODE, LOCAL_RACK, LOCAL_REMOTE, LOCAL_LENGTH } LocalTypes;
 typedef enum { MODE_BASELINE, MODE_SIERRA, MODE_IPACS, MODE_RCS, MODE_PCS, MODE_LENGTH } ModeTypes;
 typedef enum { FAIR_SCHEDULER, DELAY_SCHEDULER, SCHEDULER_LENGTH } SchedulerTypes;
 
+typedef std::map<long, long> long_map_t;
+
 struct slot_t
 {
 	long id;
@@ -26,10 +28,12 @@ struct storage_t
 	struct {
 		long capacity;
 		long used;
+		std::map<long, void*> blocks;
 	} disk;
 	struct {
 		long capacity;
 		long used;
+		std::map<long, void*> blocks;
 	} budget;
 };
 
@@ -45,21 +49,26 @@ struct node_t
 	storage_t space;
 };
 
+typedef std::map<long, node_t*> node_map_t;
+
 struct rack_t
 {
 	long id;
 	long rank;
 	StateTypes state;
-	std::map<long, node_t*> active_node_set;
-	std::map<long, node_t*> standby_node_set;
+	node_map_t active_node_set;
+	node_map_t standby_node_set;
+	std::map<long, void*> blocks;
 };
+
+typedef std::map<long, rack_t*> rack_map_t;
 
 struct block_t
 {
 	long id;
 	long file_id;
-	std::map<long, node_t*> local_node;
-	std::map<long, rack_t*> local_rack;
+	node_map_t local_node;
+	rack_map_t local_rack;
 };
 
 struct file_t
@@ -67,7 +76,7 @@ struct file_t
 	long id;
 	long size;
 	std::vector<block_t*> blocks;
-	std::map<long, long> acc;
+	long_map_t acc;
 };
 
 struct job_t

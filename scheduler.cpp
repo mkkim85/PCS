@@ -10,7 +10,7 @@ bool sort_queue(const job_t *l, const job_t *r)
 	return l->running < r->running;
 }
 
-msg_t* scheduler(long node)
+msg_t * scheduler(long node)
 {
 	long i, select;
 	long rack = GET_RACK_FROM_NODE(node);
@@ -54,7 +54,7 @@ msg_t* scheduler(long node)
 			else if ((locality == LOCAL_REMOTE || locality == LOCAL_LENGTH)
 				&& block->local_rack.find(rack) != block->local_rack.end())
 			{
-				std::map<long, node_t*>::iterator iter;
+				node_map_t::iterator iter;
 				for (iter = block->local_node.begin(); iter != block->local_node.end(); ++iter)
 				{
 					long tnid = iter->second->id;
@@ -72,7 +72,7 @@ msg_t* scheduler(long node)
 			{
 				do {
 					select = uniform_int(0, REPLICATION_FACTOR - 1);
-					std::map<long, node_t*>::iterator iter = block->local_node.begin();
+					node_map_t::iterator iter = block->local_node.begin();
 					for (long cnt = 0; cnt < select; ++cnt)
 					{
 						++iter;
@@ -92,7 +92,7 @@ msg_t* scheduler(long node)
 	}
 	else if (SETUP_SCHEDULER_TYPE == DELAY_SCHEDULER)
 	{
-
+		// TODO: delay scheduler
 	}
 
 	return NULL;

@@ -4,10 +4,12 @@ bool MANAGER_CS[NODE_NUM] = { false, };
 bool stable = true;
 long MANAGER_MAP_SLOT_CAPACITY;
 long MANAGER_NODE_NUM;
-long MANAGER_BAG_SIZE;
+long MANAGER_BAG_SIZE, MANAGER_BUDGET_SIZE;
+node_map_t MANAGER_CS_NODES;
 std::list<long> INCOMPLETE_MAP_TASKS_Q;
-std::list<std::map<long, long>> FILE_ACC_H;
+std::list<long_map_t> FILE_ACC_H;
 std::priority_queue<rack_t, std::vector<rack_t>, rank_cmp> MANAGER_RANK;
+std::map<long, std::map<long, std::list<long>>> MANAGER_BUDGET_MAP;
 
 extern node_t NODES[NODE_NUM];
 extern rack_t RACKS[RACK_NUM];
@@ -17,9 +19,9 @@ extern long SETUP_TIME_WINDOW;
 extern double SETUP_ALPHA;
 extern double SETUP_BETA;
 extern long SETUP_MODE_TYPE;
-extern std::map<long, node_t*> ACTIVE_NODE_SET, STANDBY_NODE_SET;
-extern std::map<long, rack_t*> ACTIVE_RACK_SET, STANDBY_RACK_SET;
-extern std::map<long, rack_t*> ACTIVE_RACK_NPG_SET, NPG_SET;
+extern node_map_t ACTIVE_NODE_SET, STANDBY_NODE_SET;
+extern rack_map_t ACTIVE_RACK_SET, STANDBY_RACK_SET;
+extern rack_map_t ACTIVE_RACK_NPG_SET, NPG_SET;
 extern mailbox *M_NODE[NODE_NUM];
 
 void state_manager(void)
@@ -28,7 +30,7 @@ void state_manager(void)
 	long stable_t = clock;
 	long req_m, top_k, size;
 	long m_total = 0;
-	std::map<long, long> *bag = NULL;
+	long_map_t *bag = NULL;
 
 	if (SETUP_MODE_TYPE == MODE_BASELINE) return;
 
@@ -96,7 +98,7 @@ void state_manager(void)
 	}
 }
 
-std::map<long, long>* FindSierra(bool cs[], long top_k, long req_m)
+long_map_t* FindSierra(bool cs[], long top_k, long req_m)
 {
 	long g, node;
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
@@ -121,7 +123,7 @@ std::map<long, long>* FindSierra(bool cs[], long top_k, long req_m)
 	return NULL;
 }
 
-std::map<long, long>* FindiPACS(bool cs[], std::map<long, long> *bag, long top_k, long req_m)
+long_map_t* FindiPACS(bool cs[], long_map_t *bag, long top_k, long req_m)
 {
 	long g, node;
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
@@ -132,12 +134,12 @@ std::map<long, long>* FindiPACS(bool cs[], std::map<long, long> *bag, long top_k
 
 	if (bag != NULL)
 	{
-		std::map<long, long>::iterator iter;
+		long_map_t::iterator iter;
 		for (iter = bag->begin(); iter != bag->end(); bag->erase(iter++))
 		{
 			long cnt = top_k;
 			block = GetBlock(iter->first);
-			std::map<long, node_t*>::iterator item = block->local_node.begin();
+			node_map_t::iterator item = block->local_node.begin();
 			while (cnt--)
 			{
 				++item;
@@ -151,10 +153,10 @@ std::map<long, long>* FindiPACS(bool cs[], std::map<long, long> *bag, long top_k
 		}
 	}
 
-	std::map<long, node_t*> S = STANDBY_NODE_SET;
+	node_map_t S = STANDBY_NODE_SET;
 	while (req_m > 0 && !S.empty())
 	{
-		std::map<long, node_t*>::iterator item = S.begin();
+		node_map_t::iterator item = S.begin();
 		std::advance(item, uniform_int(0, S.size() - 1));
 		node = item->second->id;
 		cs[node] = true;
@@ -165,25 +167,25 @@ std::map<long, long>* FindiPACS(bool cs[], std::map<long, long> *bag, long top_k
 	return bag;
 }
 
-std::map<long, long>* FindRCS(bool cs[], long req_m)
+long_map_t* FindRCS(bool cs[], long req_m)
 {
 	long g, node;
 	rack_t *rack;
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
 	memset(&MANAGER_CS[CS_NODE_NUM], false, sizeof(bool)* NODE_NUM - CS_NODE_NUM);
 
-	std::map<long, rack_t*> S = STANDBY_RACK_SET;
+	rack_map_t S = STANDBY_RACK_SET;
 	while (req_m > 0 && S.size() > 0)
 	{
-		std::map<long, rack_t*>::iterator ritem = S.begin();
+		rack_map_t::iterator ritem = S.begin();
 		std::advance(ritem, uniform_int(0, S.size() - 1));
 		rack = ritem->second;
 		S.erase(ritem);
 
-		std::map<long, node_t*> N = rack->standby_node_set;
+		node_map_t N = rack->standby_node_set;
 		while (req_m > 0 && !N.empty())
 		{
-			std::map<long, node_t*>::iterator nitem = N.begin();
+			node_map_t::iterator nitem = N.begin();
 			std::advance(nitem, uniform_int(0, N.size() - 1));
 			node = nitem->second->id;
 
@@ -199,13 +201,13 @@ std::map<long, long>* FindRCS(bool cs[], long req_m)
 	return NULL;
 }
 
-std::map<long, long>* FindPCS(bool cs[], std::map<long, long> *bag, long req_m)
+long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 {
 	long i, budget_size = 0, bag_size = MANAGER_BAG_SIZE;
 	node_t *node;
 	rack_t *rack;
-	std::map<long, rack_t*> F = NPG_SET;
-	std::map<long, rack_t*> F_INTERSECT_RACTIVE = ACTIVE_RACK_NPG_SET;
+	rack_map_t F = NPG_SET;
+	rack_map_t F_INTERSECT_RACTIVE = ACTIVE_RACK_NPG_SET;
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
 	memset(&MANAGER_CS[CS_NODE_NUM], false, sizeof(bool)* NODE_NUM - CS_NODE_NUM);
 
@@ -218,21 +220,21 @@ std::map<long, long>* FindPCS(bool cs[], std::map<long, long> *bag, long req_m)
 		}
 		else if (!F_INTERSECT_RACTIVE.empty())
 		{
-			std::map<long, rack_t*>::iterator item = F_INTERSECT_RACTIVE.begin();
+			rack_map_t::iterator item = F_INTERSECT_RACTIVE.begin();
 			std::advance(item, uniform_int(0, F_INTERSECT_RACTIVE.size() - 1));
 			i = item->second->id;
 			F_INTERSECT_RACTIVE.erase(i);
 		}
 		else
 		{
-			std::map<long, rack_t*>::iterator item = F.begin();
+			rack_map_t::iterator item = F.begin();
 			std::advance(item, uniform_int(0, F.size() - 1));
 			i = item->second->id;
 		}
 		F.erase(i);
 		rack = &RACKS[i];
 
-		std::map<long, node_t*>::iterator item = rack->standby_node_set.begin(),
+		node_map_t::iterator item = rack->standby_node_set.begin(),
 			end = rack->standby_node_set.end();
 
 		while (item != end)
@@ -240,15 +242,70 @@ std::map<long, long>* FindPCS(bool cs[], std::map<long, long> *bag, long req_m)
 			node = item->second;
 			if (cs[node->id] == false)
 			{
+				MANAGER_CS_NODES[node->id] = node;
 				cs[node->id] = true;
 				req_m -= MAP_SLOTS;
-				// TODO: Invalidate replicas of n's storage budget that are not appeared in bag;
-				// TODO: B = B - n.getBlockList();
+				
+				// Invalidate replicas of n's storage budget that are not appeared in bag;
+				std::map<long, void*>::iterator itr = node->space.budget.blocks.begin(),
+					iend = node->space.budget.blocks.end();
+				while (itr != iend)
+				{
+					block_t *b = (block_t*)itr->second;
+					if (bag->find(b->id) == bag->end())
+					{
+						b->local_node.erase(node->id);
+						b->local_rack.erase(GET_RACK_FROM_NODE(node->id));
+						node->space.budget.blocks.erase(itr++);
+						--node->space.used;
+						--node->space.budget.used;
+					}
+					else
+					{
+						++itr;
+					}
+				}
+
+				// B = B - n.getBlockList();
+				itr = node->space.disk.blocks.begin(),
+					iend = node->space.disk.blocks.end();
+				while (itr != iend)
+				{	// disk
+					block_t *b = (block_t*)itr->second;
+					if (bag->find(b->id) != bag->end())
+					{
+						if (--(*bag)[b->id] == 0)
+						{
+							bag->erase(b->id);
+						}
+						--bag_size;
+					}
+					++itr;
+				}
+
+				itr = node->space.budget.blocks.begin(),
+					iend = node->space.budget.blocks.end();
+				while (itr != iend)
+				{	// budget
+					block_t *b = (block_t*)itr->second;
+					if (bag->find(b->id) != bag->end())
+					{
+						if (--(*bag)[b->id] == 0)
+						{
+							bag->erase(b->id);
+						}
+						--bag_size;
+					}
+					++itr;
+				}
+
 				budget_size = budget_size + (node->space.budget.capacity - node->space.budget.used);
 			}
 
 			if (req_m <= 0 && budget_size >= bag_size)
 			{
+				MANAGER_BAG_SIZE = bag_size;
+				MANAGER_BUDGET_SIZE = budget_size;
 				return bag;
 			}
 
@@ -256,10 +313,13 @@ std::map<long, long>* FindPCS(bool cs[], std::map<long, long> *bag, long req_m)
 		}
 	}
 
+	MANAGER_BAG_SIZE = bag_size;
+	MANAGER_BUDGET_SIZE = budget_size;
+
 	return bag;
 }
 
-void ActivateNodes(bool cs[], std::map<long, long> *bag)
+void ActivateNodes(bool cs[], long_map_t *bag)
 {
 	long i;
 	MANAGER_NODE_NUM = CS_NODE_NUM;
@@ -268,13 +328,138 @@ void ActivateNodes(bool cs[], std::map<long, long> *bag)
 
 	if (SETUP_MODE_TYPE == MODE_PCS && bag != NULL)
 	{ // TODO: using bag
-		;
+		if (!bag->empty())
+		{
+			long listSize = MANAGER_BAG_SIZE;
+			long sBudgetSize = MANAGER_BUDGET_SIZE;
+
+			if (MANAGER_CS_NODES.size() == 1) {	// turn on two nodes more for distribute replications
+				node_t *node = MANAGER_CS_NODES.begin()->second;
+				for (i = 0; i < 2; ++i) {
+					node = &NODES[node->id + 1];
+					MANAGER_CS_NODES[node->id] = node;
+					cs[node->id] = true;
+					std::map<long, void*>::iterator itr = node->space.budget.blocks.begin(), iend = node->space.budget.blocks.end();
+					while (itr != iend) {
+						block_t *b = (block_t*)itr->second;
+						if (bag->find(b->id) == bag->end()) {
+							b->local_node.erase(node->id);
+							b->local_rack.erase(GET_RACK_FROM_NODE(node->id));
+							node->space.budget.blocks.erase(itr++);
+							--node->space.used;
+							--node->space.budget.used;
+						}
+						else {
+							++itr;
+						}
+					} itr = node->space.disk.blocks.begin(), iend = node->space.disk.blocks.end();
+					while (itr != iend) {	// disk
+						block_t *b = (block_t*)itr->second;
+						if (bag->find(b->id) != bag->end()) {
+							if (--(*bag)[b->id] == 0) {
+								bag->erase(b->id);
+							} --listSize;
+						} ++itr;
+					} itr = node->space.budget.blocks.begin(), iend = node->space.budget.blocks.end();
+					while (itr != iend) {	// budget
+						block_t *b = (block_t*)itr->second;
+						if (bag->find(b->id) != bag->end()) {
+							if (--(*bag)[b->id] == 0) {
+								bag->erase(b->id);
+							} --listSize;
+						} ++itr;
+					} sBudgetSize = sBudgetSize + (node->space.budget.capacity - node->space.budget.used);
+				}
+			}
+
+			MANAGER_BUDGET_MAP.clear();
+			node_map_t::iterator it = MANAGER_CS_NODES.begin(), itend = MANAGER_CS_NODES.end();
+			long_map_t nb;
+			while (it != itend)
+			{
+				node_t *node = it->second;
+				long nBudgetSize = node->space.budget.capacity - node->space.budget.used;
+				nb[node->id] = ceil(((double)nBudgetSize / sBudgetSize) * listSize);
+				rack_t *rack = &RACKS[GET_RACK_FROM_NODE(node->id)];
+				
+				// バi = B○i.getBlockList() - n,getBlockList()
+				std::map<long, block_t*> pi;
+				std::map<long, void*>::iterator tit = rack->blocks.begin(), titend = rack->blocks.end();
+				while (tit != titend)
+				{
+					block_t *b = (block_t*)tit->second;
+					if (bag->find(b->id) != bag->end()	// B○i.getBlockList()
+						&& node->space.disk.blocks.find(b->id) == node->space.disk.blocks.end() 
+						&& node->space.budget.blocks.find(b->id) == node->space.budget.blocks.end())
+					{
+						pi[b->id] = b;
+					}
+					++tit;
+				}
+				if (!pi.empty() && pi.size() <= nb[node->id])
+				{
+					// transfer every block of バi from source nodes of rack i to n
+					// B = B - バi
+					// nb = nb - |バi|
+					std::map<long, block_t*>::iterator pit = pi.begin(), pitend = pi.end();
+					std::map<long, std::list<long>> v;
+					while (pit != pitend)
+					{
+						block_t *b = pit->second;
+						v[rack->id].push_back(b->id);
+						if (--(*bag)[b->id] = 0)
+						{
+							bag->erase(b->id);
+						}
+						++pit;
+					}
+					MANAGER_BUDGET_MAP[node->id] = v;
+					nb[node->id] = nb[node->id] - pi.size();
+				}
+				else if (!pi.empty() && pi.size() > nb[node->id])
+				{
+					// transfer nb blocks of バi from source nodes of rack i to n
+					// B = B - list of transferred blocks
+					// nb = 0
+					std::map<long, block_t*>::iterator pit = pi.begin(), pitend = pi.end();
+					std::map<long, std::list<long>> v;
+					long cnt = 0, max_cnt = nb[node->id];
+					while (pit != pitend && cnt++ < max_cnt)
+					{
+						block_t *b = pit->second;
+						v[rack->id].push_back(b->id);
+						if (--(*bag)[b->id] = 0)
+						{
+							bag->erase(b->id);
+						}
+						++pit;
+					}
+					MANAGER_BUDGET_MAP[node->id] = v;
+					nb[node->id] = 0;
+				}
+
+				++it;
+			}
+
+			it = MANAGER_CS_NODES.begin(), itend = MANAGER_CS_NODES.end();
+			while (it != itend)
+			{
+				node_t *node = it->second;
+				if (nb[node->id] > 0)
+				{
+					// transfer nb blocks of B from any source nodes to n
+					// B = B - list of transferred blocks
+
+				}
+				++it;
+			}
+		}
 	}
 
 	for (i = CS_NODE_NUM; i < NODE_NUM; ++i)
 	{
 		if (cs[i] == true)
-		{
+		{	// turn on nodes
 			if (NODES[i].state == STATE_STANDBY)
 			{
 				msg = new msg_t;
@@ -286,7 +471,7 @@ void ActivateNodes(bool cs[], std::map<long, long> *bag)
 			++MANAGER_NODE_NUM;
 		}
 		else
-		{
+		{	// turn off nodes
 			if (NODES[i].state == STATE_IDLE || NODES[i].state == STATE_PEAK)
 			{
 				msg = new msg_t;

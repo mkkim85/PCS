@@ -1,8 +1,8 @@
 #include "header.h"
 
 rack_t RACKS[RACK_NUM];
-std::map<long, rack_t*> ACTIVE_RACK_SET, STANDBY_RACK_SET;
-std::map<long, rack_t*> ACTIVE_RACK_NPG_SET, NPG_SET;
+rack_map_t ACTIVE_RACK_SET, STANDBY_RACK_SET;
+rack_map_t ACTIVE_RACK_NPG_SET, NPG_SET;
 
 extern facility *F_MASTER_SWITCH;
 extern facility_ms *FM_RACK_SWTICH[RACK_NUM];
