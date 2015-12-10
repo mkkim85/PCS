@@ -42,7 +42,7 @@ void gen_file(void)
 			++NODES[node].space.used;
 			++NODES[node].space.disk.used;
 			NODES[node].space.disk.blocks[b->id] = b;
-			RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = b;
+			RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
 
 			for (j = 1; j < REPLICATION_FACTOR; ++j)
 			{
@@ -52,7 +52,7 @@ void gen_file(void)
 				++NODES[node].space.used;
 				++NODES[node].space.disk.used;
 				NODES[node].space.disk.blocks[b->id] = b;
-				RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = b;
+				RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
 			}
 
 			f->blocks.push_back(b);

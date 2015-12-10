@@ -58,7 +58,7 @@ struct rack_t
 	StateTypes state;
 	node_map_t active_node_set;
 	node_map_t standby_node_set;
-	std::map<long, void*> blocks;
+	std::map<long, long> blocks;
 };
 
 typedef std::map<long, rack_t*> rack_map_t;
@@ -84,6 +84,7 @@ struct job_t
 	long id;
 	long running;
 	long map_total;
+	long skipcount;
 	std::vector<block_t*> map_splits;
 	struct {
 		double begin;

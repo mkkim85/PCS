@@ -33,7 +33,7 @@ void init_node(void);
 void node(long id);
 bool cache_hit(long nid, long bid);
 void mem_caching(long nid, long bid);
-void node_cpu(long id);
+void node_cpu(long id, double t);
 void node_mem(long id, long n);
 void node_disk(long id, long n);
 

@@ -44,8 +44,6 @@
 #define MAX_MESSAGES			(MAX_MAILBOXES)
 #define MAX_EVENTS				((MAX_SERVERS + MAX_MESSAGES) * 2)
 
-#define NAN						-1
-
 #define GET_NODE_FROM_MAPPER(N)	((N < MAP_SLOTS) ? (0) : (N / MAP_SLOTS))
 #define GET_RACK_FROM_NODE(N)	((N < NODE_NUM_IN_RACK) ? (0) : (N / NODE_NUM_IN_RACK))
 #define GET_G_FROM_NODE(N)		((N < CS_NODE_NUM) ? (0) : (N / CS_NODE_NUM))

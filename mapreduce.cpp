@@ -61,6 +61,7 @@ void mapper(long id)
 	long node = GET_NODE_FROM_MAPPER(id), local_node;
 	long rack = GET_RACK_FROM_NODE(node), local_rack;
 	long group = GET_G_FROM_RACK(rack);
+	double cpu_use_t;
 	LocalTypes locality;
 	block_t *block;
 	file_t *file;
@@ -108,6 +109,7 @@ void mapper(long id)
 
 		if (locality == LOCAL_NODE)
 		{
+			cpu_use_t = MAP_COMPUTATION_TIME / 2;
 			if (cache_hit(node, block->id))
 			{
 				double mem = clock;
@@ -123,6 +125,7 @@ void mapper(long id)
 		}
 		else
 		{
+			cpu_use_t = MAP_COMPUTATION_TIME;
 			double network = clock;
 			local_node = r->task.local_node;
 			local_rack = GET_RACK_FROM_NODE(local_node);
@@ -142,7 +145,7 @@ void mapper(long id)
 		}
 
 		double cpu = clock;
-		node_cpu(node);
+		node_cpu(node, cpu_use_t);
 		T_TASK_TIMES[O_CPU]->record(abs(clock - cpu));
 
 		mem_caching(node, block->id);

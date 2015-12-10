@@ -1,6 +1,7 @@
 #include "header.h"
 
 bool MANAGER_CS[NODE_NUM] = { false, };
+bool MANAGER_CS_RACKS[RACK_NUM] = { false, };
 bool stable = true;
 long MANAGER_MAP_SLOT_CAPACITY;
 long MANAGER_NODE_NUM;
@@ -209,7 +210,9 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 	rack_map_t F = NPG_SET;
 	rack_map_t F_INTERSECT_RACTIVE = ACTIVE_RACK_NPG_SET;
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
-	memset(&MANAGER_CS[CS_NODE_NUM], false, sizeof(bool)* NODE_NUM - CS_NODE_NUM);
+	memset(&MANAGER_CS[CS_NODE_NUM], false, sizeof(bool) * NODE_NUM - CS_NODE_NUM);
+	memset(&MANAGER_CS_RACKS, true, sizeof(bool) * CS_RACK_NUM);
+	memset(&MANAGER_CS_RACKS[CS_RACK_NUM], false, sizeof(bool) * RACK_NUM - CS_RACK_NUM);
 
 	while ((req_m > 0 || !bag->empty()) && !F.empty())
 	{
@@ -233,6 +236,7 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 		}
 		F.erase(i);
 		rack = &RACKS[i];
+		MANAGER_CS_RACKS[i] = true;
 
 		node_map_t::iterator item = rack->standby_node_set.begin(),
 			end = rack->standby_node_set.end();
@@ -333,42 +337,60 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 			long listSize = MANAGER_BAG_SIZE;
 			long sBudgetSize = MANAGER_BUDGET_SIZE;
 
-			if (MANAGER_CS_NODES.size() == 1) {	// turn on two nodes more for distribute replications
+			if (MANAGER_CS_NODES.size() == 1)
+			{	// turn on two nodes more for distribute replications
 				node_t *node = MANAGER_CS_NODES.begin()->second;
-				for (i = 0; i < 2; ++i) {
+				for (i = 0; i < 2; ++i)
+				{
 					node = &NODES[node->id + 1];
 					MANAGER_CS_NODES[node->id] = node;
 					cs[node->id] = true;
 					std::map<long, void*>::iterator itr = node->space.budget.blocks.begin(), iend = node->space.budget.blocks.end();
-					while (itr != iend) {
+					while (itr != iend)
+					{
 						block_t *b = (block_t*)itr->second;
-						if (bag->find(b->id) == bag->end()) {
+						if (bag->find(b->id) == bag->end())
+						{
 							b->local_node.erase(node->id);
 							b->local_rack.erase(GET_RACK_FROM_NODE(node->id));
 							node->space.budget.blocks.erase(itr++);
 							--node->space.used;
 							--node->space.budget.used;
 						}
-						else {
+						else
+						{
 							++itr;
 						}
-					} itr = node->space.disk.blocks.begin(), iend = node->space.disk.blocks.end();
-					while (itr != iend) {	// disk
+					}
+					itr = node->space.disk.blocks.begin(), iend = node->space.disk.blocks.end();
+					while (itr != iend)
+					{	// disk
 						block_t *b = (block_t*)itr->second;
-						if (bag->find(b->id) != bag->end()) {
-							if (--(*bag)[b->id] == 0) {
+						if (bag->find(b->id) != bag->end())
+						{
+							if (--(*bag)[b->id] == 0)
+							{
 								bag->erase(b->id);
-							} --listSize;
-						} ++itr;
-					} itr = node->space.budget.blocks.begin(), iend = node->space.budget.blocks.end();
-					while (itr != iend) {	// budget
+							}
+							--listSize;
+						}
+						++itr;
+					}
+					itr = node->space.budget.blocks.begin(), iend = node->space.budget.blocks.end();
+					while (itr != iend)
+					{	// budget
 						block_t *b = (block_t*)itr->second;
-						if (bag->find(b->id) != bag->end()) {
-							if (--(*bag)[b->id] == 0) {
+						if (bag->find(b->id) != bag->end())
+						{
+							if (--(*bag)[b->id] == 0)
+							{
 								bag->erase(b->id);
-							} --listSize;
-						} ++itr;
-					} sBudgetSize = sBudgetSize + (node->space.budget.capacity - node->space.budget.used);
+							}
+							--listSize;
+						}
+						++itr;
+					}
+					sBudgetSize = sBudgetSize + (node->space.budget.capacity - node->space.budget.used);
 				}
 			}
 
@@ -384,10 +406,10 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 				
 				// ¥Ði = B¡ûi.getBlockList() - n,getBlockList()
 				std::map<long, block_t*> pi;
-				std::map<long, void*>::iterator tit = rack->blocks.begin(), titend = rack->blocks.end();
+				std::map<long, long>::iterator tit = rack->blocks.begin(), titend = rack->blocks.end();
 				while (tit != titend)
 				{
-					block_t *b = (block_t*)tit->second;
+					block_t *b = GetBlock(tit->first);
 					if (bag->find(b->id) != bag->end()	// B¡ûi.getBlockList()
 						&& node->space.disk.blocks.find(b->id) == node->space.disk.blocks.end() 
 						&& node->space.budget.blocks.find(b->id) == node->space.budget.blocks.end())
@@ -406,14 +428,13 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 					while (pit != pitend)
 					{
 						block_t *b = pit->second;
-						v[rack->id].push_back(b->id);
-						if (--(*bag)[b->id] = 0)
+						MANAGER_BUDGET_MAP[node->id][rack->id].push_back(b->id);
+						if (--(*bag)[b->id] == 0)
 						{
 							bag->erase(b->id);
 						}
 						++pit;
 					}
-					MANAGER_BUDGET_MAP[node->id] = v;
 					nb[node->id] = nb[node->id] - pi.size();
 				}
 				else if (!pi.empty() && pi.size() > nb[node->id])
@@ -422,35 +443,52 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 					// B = B - list of transferred blocks
 					// nb = 0
 					std::map<long, block_t*>::iterator pit = pi.begin(), pitend = pi.end();
-					std::map<long, std::list<long>> v;
 					long cnt = 0, max_cnt = nb[node->id];
 					while (pit != pitend && cnt++ < max_cnt)
 					{
 						block_t *b = pit->second;
-						v[rack->id].push_back(b->id);
-						if (--(*bag)[b->id] = 0)
+						MANAGER_BUDGET_MAP[node->id][rack->id].push_back(b->id);
+						if (--(*bag)[b->id] == 0)
 						{
 							bag->erase(b->id);
 						}
 						++pit;
 					}
-					MANAGER_BUDGET_MAP[node->id] = v;
 					nb[node->id] = 0;
 				}
 
 				++it;
 			}
-
 			it = MANAGER_CS_NODES.begin(), itend = MANAGER_CS_NODES.end();
 			while (it != itend)
 			{
+				// transfer nb blocks of B from any source nodes to n
+				// B = B - list of transferred blocks
 				node_t *node = it->second;
-				if (nb[node->id] > 0)
+				long cnt = 0, max_cnt = nb[node->id];
+				long_map_t::iterator bit = bag->begin(), bitend = bag->end();
+				while (cnt < max_cnt && bit != bitend)
 				{
-					// transfer nb blocks of B from any source nodes to n
-					// B = B - list of transferred blocks
-
+					block_t *b = GetBlock(bit->first);
+					
+					rack_map_t::iterator rit;
+					do {
+						rit = b->local_rack.begin();
+						std::advance(rit, uniform_int(0, b->local_rack.size() - 1));
+					} while (MANAGER_CS_RACKS[rit->second->id] == false);
+					rack_t *rack = rit->second;
+					MANAGER_BUDGET_MAP[node->id][rack->id].push_back(b->id);
+					if (--(*bag)[b->id] == 0)
+					{
+						bag->erase(bit++);
+					}
+					else
+					{
+						++bit;
+					}
+					++cnt;
 				}
+				nb[node->id] = 0;
 				++it;
 			}
 		}

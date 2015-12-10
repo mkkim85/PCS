@@ -18,6 +18,7 @@ extern long MANAGER_MAP_SLOT_CAPACITY;
 extern std::vector<long> HEARTBEAT;
 extern bool MANAGER_CS[NODE_NUM];
 extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
+extern std::map<long, std::map<long, std::list<long>>> MANAGER_BUDGET_MAP;
 
 void init_node(void)
 {
@@ -108,10 +109,38 @@ void node(long id)
 
 		if (r->power.power == true && my->state == STATE_STANDBY)
 		{
-			// TODO: Copy replications in budget
-			//if (SETUP_MODE_TYPE == MODE_PCS /* && budget have to filled */)
-			//{
-			//}
+			// Copy replications in budget
+			if (SETUP_MODE_TYPE == MODE_PCS
+				&& MANAGER_BUDGET_MAP.find(id) != MANAGER_BUDGET_MAP.end())
+			{
+				std::map<long, std::list<long>>::iterator it = MANAGER_BUDGET_MAP[id].begin(),
+					itend = MANAGER_BUDGET_MAP[id].end();
+
+				while (it != itend)
+				{
+					switch_rack(it->first, parent->id, it->second.size());
+					// insert blocks in budget
+					while (!it->second.empty())
+					{
+						block_t *b = GetBlock(it->second.front());
+						it->second.pop_front();
+						my->space.budget.blocks[b->id] = b;
+						++my->space.budget.used;
+						++my->space.used;
+						if (parent->blocks.find(b->id) == parent->blocks.end())
+						{
+							parent->blocks[b->id] = 1;
+						}
+						else
+						{
+							++parent->blocks[b->id];
+						}
+						b->local_node[id] = my;
+						b->local_rack[rack] = parent;
+					}
+					++it;
+				}
+			}
 			if (parent->state == STATE_STANDBY)
 			{
 				turnon_rack(rack);
@@ -147,7 +176,24 @@ void node(long id)
 			}
 
 			MEMORY[id].clear();
-			my->space.used -= my->space.budget.used;
+			if (SETUP_MODE_TYPE == MODE_PCS && !my->space.budget.blocks.empty())
+			{
+				std::map<long, void*>::iterator it = my->space.budget.blocks.begin(),
+					itend = my->space.budget.blocks.end();
+				while (it != itend)
+				{
+					block_t *b = (block_t*)it->second;
+					b->local_node.erase(id);
+					b->local_rack.erase(rack);
+					if (--parent->blocks[b->id] == 0)
+					{
+						parent->blocks.erase(b->id);
+					}
+					++it;
+				}
+				my->space.budget.blocks.clear();
+			}
+			my->space.used = my->space.used - my->space.budget.used;
 			my->space.budget.used = 0;
 
 			--REPORT_NODE_STATE_COUNT[my->state];
@@ -240,10 +286,10 @@ void mem_caching(long nid, long bid)
 	}
 }
 
-void node_cpu(long id)
+void node_cpu(long id, double t)
 {
 	double btime = clock;
-	FM_CPU[id]->use(MAP_COMPUTATION_TIME);
+	FM_CPU[id]->use(t);
 
 	if (LOGGING)
 	{

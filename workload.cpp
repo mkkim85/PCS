@@ -4,6 +4,7 @@ long REMAIN_MAP_TASKS;
 long MAX_JOB_ID;
 std::map<long, job_t*> JOB_MAP;
 std::list<job_t*> MAP_QUEUE;
+double SCENARIO[][2] = { { 30 * MINUTE, 60 }, { 120 * MINUTE, 35 }, { 180 * MINUTE, 40 }, { 270 * MINUTE, 20 }, { 300 * MINUTE, 60 } };
 
 extern bool CSIM_END;
 extern std::vector<file_t*> FILE_VEC[CS_RACK_NUM];
@@ -27,6 +28,7 @@ void workload(void)
 		job->time.qin = clock;
 		job->time.qtotal = 0;
 		job->map_total = 0;
+		job->skipcount = 0;	// for delay scheduler
 
 		while (job->map_splits.size() < JOB_MAP_TASK_NUM)
 		{
@@ -60,6 +62,5 @@ void workload(void)
 		}
 
 		hold(30);
-		//hold(60.0);
 	}
 }
