@@ -68,7 +68,7 @@ struct block_t
 	long id;
 	long file_id;
 	node_map_t local_node;
-	rack_map_t local_rack;
+	long_map_t local_rack;
 };
 
 struct file_t

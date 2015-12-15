@@ -1,6 +1,7 @@
 #include "header.h"
 
-std::vector<long> HEARTBEAT;
+//std::vector<long> HEARTBEAT;
+node_map_t HEARTBEAT;
 
 extern node_t NODES[NODE_NUM];
 extern slot_t MAPPER[MAP_SLOTS_MAX];
@@ -19,26 +20,38 @@ extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
 void job_tracker(void)
 {
 	msg_t *msg;
-	long i, node;
+	long i;
+	node_t *node;
 
 	create("job_tracker");
 	while (!CSIM_END)
 	{
-		std::vector<long> heartbeat;
+		//std::vector<long> heartbeat, reuse;
+		node_map_t heartbeat, reuse;
 
 		if (MAP_QUEUE.empty() == false && HEARTBEAT.empty() == false)
 		{
 			heartbeat = HEARTBEAT;
 		}
 
-		while (heartbeat.empty() == false && MAP_QUEUE.empty() == false)
+		while ((heartbeat.empty() == false || reuse.empty() == false)
+			&& MAP_QUEUE.empty() == false)
 		{
-			i = uniform_int(0, heartbeat.size() - 1);
-			node = heartbeat.at(i);
-			heartbeat.erase(heartbeat.begin() + i);
+			if (heartbeat.empty() == true && reuse.empty() == false)
+			{	// reusing skipped heartbeats
+				heartbeat = reuse;
+				reuse.clear();
+			}
 
-			if ((msg = scheduler(node)) == NULL)
+			i = uniform_int(0, heartbeat.size() - 1);
+			node_map_t::iterator it = heartbeat.begin();
+			std::advance(it, uniform_int(0, heartbeat.size() - 1));
+			node = it->second;
+			heartbeat.erase(node->id);
+
+			if ((msg = scheduler(node->id)) == NULL)
 			{
+				reuse[node->id] = node;
 				continue;
 			}
 			if (msg != NULL &&
@@ -99,17 +112,15 @@ void mapper(long id)
 		}
 		if (NODES[node].mapper.used == NODES[node].mapper.capacity)
 		{
-			std::vector<long>::iterator iter = find(HEARTBEAT.begin(), HEARTBEAT.end(), node);
-			if (iter != HEARTBEAT.end())
+			if (HEARTBEAT.find(node) != HEARTBEAT.end())
 			{
-				HEARTBEAT.erase(find(HEARTBEAT.begin(), HEARTBEAT.end(), node));
+				HEARTBEAT.erase(node);
 			}
 		}
 		MAPPER[id].used = true;
 
 		if (locality == LOCAL_NODE)
 		{
-			cpu_use_t = MAP_COMPUTATION_TIME / 2;
 			if (cache_hit(node, block->id))
 			{
 				double mem = clock;
@@ -125,7 +136,6 @@ void mapper(long id)
 		}
 		else
 		{
-			cpu_use_t = MAP_COMPUTATION_TIME;
 			double network = clock;
 			local_node = r->task.local_node;
 			local_rack = GET_RACK_FROM_NODE(local_node);
@@ -144,6 +154,14 @@ void mapper(long id)
 			T_TASK_TIMES[O_NETWORK]->record(abs(clock - network));
 		}
 
+		if (locality == LOCAL_NODE || locality == LOCAL_RACK)
+		{
+			cpu_use_t = (double)MAP_COMPUTATION_TIME / 2.0;		// 2x faster
+		}
+		else if (locality == LOCAL_REMOTE)
+		{
+			cpu_use_t = (double)MAP_COMPUTATION_TIME;
+		}
 		double cpu = clock;
 		node_cpu(node, cpu_use_t);
 		T_TASK_TIMES[O_CPU]->record(abs(clock - cpu));
@@ -166,7 +184,7 @@ void mapper(long id)
 		if ((MANAGER_CS[node] == true)
 			&& (NODES[node].mapper.used + 1 == NODES[node].mapper.capacity))
 		{
-			HEARTBEAT.push_back(node);
+			HEARTBEAT[node] = &NODES[node];
 		}
 		if (--job->running == 0 && job->map_splits.size() > 0)
 		{

@@ -16,6 +16,7 @@ extern node_t NODES[NODE_NUM];
 extern rack_t RACKS[RACK_NUM];
 extern long REMAIN_MAP_TASKS;
 extern bool CSIM_END;
+extern bool LOAD_PHASE_GROWING;
 extern long SETUP_TIME_WINDOW;
 extern double SETUP_ALPHA;
 extern double SETUP_BETA;
@@ -67,8 +68,8 @@ void state_manager(void)
 			m = (double)m_total / (double)SETUP_TIME_WINDOW;
 			mcap = MANAGER_MAP_SLOT_CAPACITY;
 
-			if (((m / mcap >= 1 + SETUP_ALPHA) && (STANDBY_NODE_SET.empty() == false))
-				|| ((m / mcap < 1 - SETUP_BETA) && ACTIVE_NODE_SET.size() > CS_NODE_NUM))
+			if (((m / mcap >= 1 + SETUP_ALPHA) && (STANDBY_NODE_SET.empty() == false) && (LOAD_PHASE_GROWING == true))
+				|| ((m / mcap < 1 - SETUP_BETA) && (ACTIVE_NODE_SET.size() > CS_NODE_NUM) && (LOAD_PHASE_GROWING == false)))
 			{
 				stable = false;
 				req_m = m - (CS_NODE_NUM * MAP_SLOTS);
@@ -471,12 +472,12 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 				{
 					block_t *b = GetBlock(bit->first);
 					
-					rack_map_t::iterator rit;
+					long_map_t::iterator rit;
 					do {
 						rit = b->local_rack.begin();
 						std::advance(rit, uniform_int(0, b->local_rack.size() - 1));
-					} while (MANAGER_CS_RACKS[rit->second->id] == false);
-					rack_t *rack = rit->second;
+					} while (MANAGER_CS_RACKS[rit->first] == false);
+					rack_t *rack = &RACKS[rit->first];
 					MANAGER_BUDGET_MAP[node->id][rack->id].push_back(b->id);
 					if (--(*bag)[b->id] == 0)
 					{

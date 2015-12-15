@@ -72,19 +72,16 @@ msg_t * scheduler(long node)
 						msg->task.split_index = i;
 						msg->task.locality = LOCAL_RACK;
 						msg->task.local_node = tnid;
+						break;
 					}
 				}
 			}
 			else if (msg->task.locality == LOCAL_LENGTH)
 			{
 				do {
-					select = uniform_int(0, REPLICATION_FACTOR - 1);
-					node_map_t::iterator iter = block->local_node.begin();
-					for (long cnt = 0; cnt < select; ++cnt)
-					{
-						++iter;
-					}
-					nptr = iter->second;
+					node_map_t::iterator it = block->local_node.begin();
+					std::advance(it, uniform_int(0, block->local_node.size() - 1));
+					nptr = it->second;
 				} while (nptr->state == STATE_STANDBY || nptr->state == STATE_ACTIVATE || nptr->state == STATE_DEACTIVATE);
 				msg->task.split_index = i;
 				msg->task.locality = LOCAL_REMOTE;
@@ -106,7 +103,7 @@ msg_t * scheduler(long node)
 			// <ref> Zaharia, Matei, et al. "Delay scheduling: a simple technique for achieving locality and fairness in cluster scheduling." Proceedings of the 5th European conference on Computer systems. ACM, 2010. </ref>
 			double gamma = 0.95;
 			long N = job->map_splits.size();
-			long R = REPLICATION_FACTOR;
+			double R = (double)ACTIVE_NODE_SET.size() / CS_NODE_NUM;
 			long M = ACTIVE_NODE_SET.size();
 			double D = -(M / R) * log(((1 - gamma) * N) / (1 + (1 - gamma) * N));
 			if (msg->task.locality == LOCAL_NODE

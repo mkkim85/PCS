@@ -1,5 +1,6 @@
 #include "header.h"
 
+bool LOAD_PHASE_GROWING = true;
 long REMAIN_MAP_TASKS;
 long MAX_JOB_ID;
 std::map<long, job_t*> JOB_MAP;
@@ -56,11 +57,11 @@ void workload(void)
 		}
 
 		// TODO: job scenario
-		if (clock >= 3600)
+		if (clock >= 7200)
 		{
 			CSIM_END = true;
 		}
 
-		hold(30);
+		hold(42);
 	}
 }

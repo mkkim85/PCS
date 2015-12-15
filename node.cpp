@@ -9,13 +9,14 @@ std::list<long> MEMORY[NODE_NUM];
 extern rack_t RACKS[RACK_NUM];
 extern double SETUP_BUDGET_RATIO;
 extern long SETUP_MODE_TYPE;
-extern facility *F_DISK[NODE_NUM], *F_MEMORY[NODE_NUM];
-extern facility_ms *FM_CPU[NODE_NUM];
+extern facility *F_MEMORY[NODE_NUM];
+extern facility_ms *FM_CPU[NODE_NUM], *FM_DISK[NODE_NUM];
 extern mailbox *M_MAPPER[MAP_SLOTS_MAX], *M_NODE[NODE_NUM];
 extern table *T_CACHE_HIT, *T_CACHE_MISS;
 extern long REPORT_NODE_STATE_COUNT[STATE_LENGTH];
 extern long MANAGER_MAP_SLOT_CAPACITY;
-extern std::vector<long> HEARTBEAT;
+//extern std::vector<long> HEARTBEAT;
+extern node_map_t HEARTBEAT;
 extern bool MANAGER_CS[NODE_NUM];
 extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
 extern std::map<long, std::map<long, std::list<long>>> MANAGER_BUDGET_MAP;
@@ -67,7 +68,7 @@ void init_node(void)
 			prack->active_node_set[i] = pnode;
 			ACTIVE_NODE_SET[i] = pnode;
 			MANAGER_MAP_SLOT_CAPACITY += MAP_SLOTS;
-			HEARTBEAT.push_back(i);
+			HEARTBEAT[i] = &NODES[i];
 			MANAGER_CS[i] = true;
 			++REPORT_NODE_STATE_COUNT_PG[pnode->state];
 		}
@@ -88,7 +89,7 @@ void init_node(void)
 		MEMORY[i].clear();
 
 		sprintf(str, "disk%ld", i);
-		F_DISK[i] = new facility(str);
+		FM_DISK[i] = new facility_ms(str, DISK_NUM);
 	}
 }
 
@@ -136,7 +137,14 @@ void node(long id)
 							++parent->blocks[b->id];
 						}
 						b->local_node[id] = my;
-						b->local_rack[rack] = parent;
+						if (b->local_rack.find(rack) == b->local_rack.end())
+						{
+							b->local_rack[rack] = 1;
+						}
+						else
+						{
+							++b->local_rack[rack];
+						}
 					}
 					++it;
 				}
@@ -159,7 +167,7 @@ void node(long id)
 			parent->active_node_set[id] = my;
 			ACTIVE_NODE_SET[id] = my;
 
-			HEARTBEAT.push_back(id);
+			HEARTBEAT[id] = my;
 		}
 		else if (r->power.power == false
 			&& (my->state == STATE_IDLE || my->state == STATE_PEAK))
@@ -169,10 +177,9 @@ void node(long id)
 				hold(1.0);
 			}
 
-			std::vector<long>::iterator iter = find(HEARTBEAT.begin(), HEARTBEAT.end(), id);
-			if (iter != HEARTBEAT.end())
+			if (HEARTBEAT.find(id) != HEARTBEAT.end())
 			{
-				HEARTBEAT.erase(iter);
+				HEARTBEAT.erase(id);
 			}
 
 			MEMORY[id].clear();
@@ -184,7 +191,10 @@ void node(long id)
 				{
 					block_t *b = (block_t*)it->second;
 					b->local_node.erase(id);
-					b->local_rack.erase(rack);
+					if (--b->local_rack[rack] == 0)
+					{
+						b->local_rack.erase(rack);
+					}
 					if (--parent->blocks[b->id] == 0)
 					{
 						parent->blocks.erase(b->id);
@@ -317,7 +327,7 @@ void node_disk(long id, long n)
 {
 	double btime = clock;
 	double t = DISK_SPEED * n;
-	F_DISK[id]->use(t);
+	FM_DISK[id]->use(t);
 
 	if (LOGGING)
 	{

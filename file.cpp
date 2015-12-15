@@ -38,7 +38,7 @@ void gen_file(void)
 
 			node = uniform_int(min, max);
 			b->local_node[node] = &NODES[node];
-			b->local_rack[GET_RACK_FROM_NODE(node)] = &RACKS[GET_RACK_FROM_NODE(node)];
+			b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
 			++NODES[node].space.used;
 			++NODES[node].space.disk.used;
 			NODES[node].space.disk.blocks[b->id] = b;
@@ -48,7 +48,7 @@ void gen_file(void)
 			{
 				node = node + CS_NODE_NUM;
 				b->local_node[node] = &NODES[node];
-				b->local_rack[GET_RACK_FROM_NODE(node)] = &RACKS[GET_RACK_FROM_NODE(node)];
+				b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
 				++NODES[node].space.used;
 				++NODES[node].space.disk.used;
 				NODES[node].space.disk.blocks[b->id] = b;
@@ -130,12 +130,12 @@ long_map_t* GetPopularBlockList(long *top_k)
 						while (cnt-- > prev)
 						{
 							++MANAGER_BAG_SIZE;
-							rack_map_t::iterator item = block->local_rack.begin(),
+							long_map_t::iterator item = block->local_rack.begin(),
 								end = block->local_rack.end();
 
 							while (++item != end)
 							{
-								++item->second->rank;
+								++RACKS[item->first].rank;
 							}
 						}
 					}
@@ -149,12 +149,12 @@ long_map_t* GetPopularBlockList(long *top_k)
 						while (cnt-- > 0)
 						{
 							++MANAGER_BAG_SIZE;
-							rack_map_t::iterator item = block->local_rack.begin(),
+							long_map_t::iterator item = block->local_rack.begin(),
 								end = block->local_rack.end();
 
 							while (++item != end)
 							{
-								++item->second->rank;
+								++RACKS[item->first].rank;
 							}
 						}
 					}
