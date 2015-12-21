@@ -16,6 +16,8 @@ extern table *T_LOCALITY[LOCAL_LENGTH];
 extern long SETUP_MODE_TYPE;
 extern bool MANAGER_CS[NODE_NUM];
 extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
+extern double REPORT_RESP_T_TOTAL;
+extern long REPORT_RESP_T_COUNT;
 
 void job_tracker(void)
 {
@@ -194,8 +196,11 @@ void mapper(long id)
 		{
 			// complete job
 			job->time.end = clock;
-			T_TURNAROUND_TIME->record(abs(job->time.end - job->time.begin));
+			double turnaround_t = abs(job->time.end - job->time.begin);
+			T_TURNAROUND_TIME->record(turnaround_t);
 			T_QDELAY_TIME->record(job->time.qtotal);
+			REPORT_RESP_T_TOTAL += turnaround_t;
+			++REPORT_RESP_T_COUNT;
 		}
 		T_LOCALITY[locality]->record(1.0);
 		--REMAIN_MAP_TASKS;

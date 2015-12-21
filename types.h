@@ -109,7 +109,7 @@ union msg_t
 };
 
 struct rank_cmp {
-	bool operator() (rack_t x, rack_t y)
+	bool operator() (const rack_t x, const rack_t y)
 	{
 		return x.rank < y.rank;
 	}

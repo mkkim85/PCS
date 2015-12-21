@@ -176,7 +176,7 @@ long_map_t* FindRCS(bool cs[], long req_m)
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
 	memset(&MANAGER_CS[CS_NODE_NUM], false, sizeof(bool)* NODE_NUM - CS_NODE_NUM);
 
-	rack_map_t S = STANDBY_RACK_SET;
+	rack_map_t S = NPG_SET;
 	while (req_m > 0 && S.size() > 0)
 	{
 		rack_map_t::iterator ritem = S.begin();
@@ -184,19 +184,16 @@ long_map_t* FindRCS(bool cs[], long req_m)
 		rack = ritem->second;
 		S.erase(ritem);
 
-		node_map_t N = rack->standby_node_set;
-		while (req_m > 0 && !N.empty())
+		long node = rack->id * NODE_NUM_IN_RACK;
+		long nend = node + NODE_NUM_IN_RACK;
+		while (req_m > 0 && node < nend)
 		{
-			node_map_t::iterator nitem = N.begin();
-			std::advance(nitem, uniform_int(0, N.size() - 1));
-			node = nitem->second->id;
-
 			if (cs[node] == false)
 			{
 				cs[node] = true;
 				req_m -= MAP_SLOTS;
 			}
-			N.erase(nitem);
+			++node;
 		}
 	}
 
@@ -239,12 +236,12 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 		rack = &RACKS[i];
 		MANAGER_CS_RACKS[i] = true;
 
-		node_map_t::iterator item = rack->standby_node_set.begin(),
-			end = rack->standby_node_set.end();
+		long nid = i * NODE_NUM_IN_RACK;
+		long nend = nid + NODE_NUM_IN_RACK;
 
-		while (item != end)
+		while (nid < nend)
 		{
-			node = item->second;
+			node = &NODES[nid];
 			if (cs[node->id] == false)
 			{
 				MANAGER_CS_NODES[node->id] = node;
@@ -314,7 +311,7 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 				return bag;
 			}
 
-			++item;
+			++nid;
 		}
 	}
 

@@ -38,7 +38,7 @@
 #define SWITCH_SPEED			0.05		// 0.05 s/block, 10 Gbps, 1.25 GB/s
 
 // setup
-#define MAX_PROCESSES			(NODE_NUM + MAP_SLOTS_MAX + 6)
+#define MAX_PROCESSES			(NODE_NUM + MAP_SLOTS_MAX + 7)
 #define MAX_FACILITIES			((NODE_NUM * 3) + RACK_NUM + 1)
 #define MAX_SERVERS				((NODE_NUM * 3) + (NODE_NUM * CPU_CORE) + (NODE_NUM * DISK_NUM) + (RACK_NUM * SWTICH_NUM) + 1)
 #define MAX_MAILBOXES			(NODE_NUM + MAP_SLOTS_MAX)

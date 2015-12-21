@@ -8,9 +8,9 @@ extern std::list<job_t*> MAP_QUEUE;
 extern node_t NODES[NODE_NUM];
 extern node_map_t ACTIVE_NODE_SET;
 
-bool sort_queue(const job_t *l, const job_t *r)
+bool sort_queue(const job_t *x, const job_t *y)
 {
-	return l->running < r->running;
+	return x->running < y->running;
 }
 
 msg_t * scheduler(long node)

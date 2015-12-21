@@ -47,13 +47,14 @@ void switch_rack(long from, long to, long n);
 void sim_report(void);
 
 // scheduler.cpp
-bool sort_queue(const job_t *l, const job_t *r);
+bool sort_queue(const job_t *x, const job_t *y);
 msg_t * scheduler(long node);
 
 // setup.cpp
 void setup(void);
 
 // workload.cpp
+void scenario(void);
 void workload(void);
 
 // zipf.cpp

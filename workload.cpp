@@ -3,17 +3,96 @@
 bool LOAD_PHASE_GROWING = true;
 long REMAIN_MAP_TASKS;
 long MAX_JOB_ID;
+double LOAD_INTERVAL;
 std::map<long, job_t*> JOB_MAP;
 std::list<job_t*> MAP_QUEUE;
-double SCENARIO[][2] = { { 30 * MINUTE, 60 }, { 120 * MINUTE, 35 }, { 180 * MINUTE, 40 }, { 270 * MINUTE, 20 }, { 300 * MINUTE, 60 } };
 
 extern bool CSIM_END;
 extern std::vector<file_t*> FILE_VEC[CS_RACK_NUM];
+extern double SETUP_DATA_SKEW;
+
+void scenario(void)
+{
+	create("scenario");
+	while (true)
+	{
+		if (clock == 0)
+		{
+			LOAD_PHASE_GROWING = true;
+			LOAD_INTERVAL = 80;
+		}
+		else if (clock == 0.5 * HOUR)
+		{
+			LOAD_PHASE_GROWING = true;
+			if (0.0 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.25)
+			{
+				LOAD_INTERVAL = 38;
+			}
+			else if (0.25 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.5)
+			{
+				LOAD_INTERVAL = 39;
+			}
+			else if (0.5 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.75)
+			{
+				LOAD_INTERVAL = 40;
+			}
+			else if (0.75 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 1.0)
+			{
+				LOAD_INTERVAL = 41;
+			}
+			else if (1.0 <= SETUP_DATA_SKEW)
+			{
+				LOAD_INTERVAL = 42;
+			}
+		}
+		else if (clock == 2.0 * HOUR)
+		{
+			LOAD_PHASE_GROWING = false;
+			LOAD_INTERVAL += 3;
+		}
+		else if (clock == 3.0 * HOUR)
+		{
+			LOAD_PHASE_GROWING = true;
+			if (0.0 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.25)
+			{
+				LOAD_INTERVAL = 22;
+			}
+			else if (0.25 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.5)
+			{
+				LOAD_INTERVAL = 23;
+			}
+			else if (0.5 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.75)
+			{
+				LOAD_INTERVAL = 24;
+			}
+			else if (0.75 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 1.0)
+			{
+				LOAD_INTERVAL = 25;
+			}
+			else if (1.0 <= SETUP_DATA_SKEW)
+			{
+				LOAD_INTERVAL = 26;
+			}
+		}
+		else if (clock == 4.5 * HOUR)
+		{
+			LOAD_PHASE_GROWING = false;
+			LOAD_INTERVAL = 80;
+		}
+		else if (clock == 5.0 * HOUR)
+		{
+			CSIM_END = true;
+			break;
+		}
+
+		hold(MINUTE);
+	}
+}
 
 void workload(void)
 {
-//	double load_scenario[] = { 1, 0.5, 0.1,
 	long i, n, max;
+	double hold_t = 60;
 	file_t *file;
 	job_t *job;
 	std::vector<block_t*>::iterator iter;
@@ -56,12 +135,6 @@ void workload(void)
 			logging(log);
 		}
 
-		// TODO: job scenario
-		if (clock >= 7200)
-		{
-			CSIM_END = true;
-		}
-
-		hold(42);
+		hold(LOAD_INTERVAL);
 	}
 }

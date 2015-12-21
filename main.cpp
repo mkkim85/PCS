@@ -14,6 +14,7 @@ extern "C" void sim(void)
 
 	setup();
 	init();
+	scenario();
 	workload();
 	job_tracker();
 	state_manager();
