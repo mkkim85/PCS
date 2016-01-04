@@ -15,15 +15,14 @@ bool sort_queue(const job_t *x, const job_t *y)
 
 msg_t * scheduler(long node)
 {
-	long i, slotid, select, skipcount;
+	long i, slotid;
 	long rack = GET_RACK_FROM_NODE(node);
-	long skippable;
 	msg_t *msg = NULL;
 	block_t *block;
 	job_t *job;
 	node_t *nptr = &NODES[node];
 	std::list<job_t*> queue;
-	std::vector<block_t*>::iterator biter;
+	std::list<job_t*>::iterator it, itend;
 
 	for (i = 0; i < MAP_SLOTS; ++i)
 	{
@@ -37,7 +36,8 @@ msg_t * scheduler(long node)
 	queue = MAP_QUEUE;
 	queue.sort(sort_queue);
 
-	std::list<job_t*>::iterator it = queue.begin(), itend = queue.end();
+	it = queue.begin();
+	itend = queue.end();
 	while (it != itend)
 	{
 		job = *it;
@@ -46,48 +46,37 @@ msg_t * scheduler(long node)
 		msg->task.id = slotid;
 		msg->task.job = job;
 		msg->task.locality = LOCAL_LENGTH;
-		skipcount = job->skipcount;
 
-		for (i = 0, biter = job->map_splits.begin(); biter != job->map_splits.end(); ++biter, ++i)
+		if (job->map_splits.find(rack) != job->map_splits.end())
 		{
-			block = *biter;
-			if (block->local_node.find(node) != block->local_node.end())
+			if (job->map_splits[rack].find(node) != job->map_splits[rack].end())
 			{
-				msg->task.split_index = i;
+				// local node
+				msg->task.block = GetBlock(job->map_splits[rack][node].begin()->first);
 				msg->task.locality = LOCAL_NODE;
 				msg->task.local_node = node;
 				job->skipcount = 0;
 				return msg;
 			}
-			else if ((msg->task.locality == LOCAL_REMOTE || msg->task.locality == LOCAL_LENGTH)
-				&& block->local_rack.find(rack) != block->local_rack.end())
-			{
-				node_map_t::iterator iter;
-				for (iter = block->local_node.begin(); iter != block->local_node.end(); ++iter)
-				{
-					long tnid = iter->second->id;
-					if (GET_RACK_FROM_NODE(tnid) == rack &&
-						(NODES[tnid].state == STATE_IDLE || NODES[tnid].state == STATE_PEAK))
-					{
-						msg->task.split_index = i;
-						msg->task.locality = LOCAL_RACK;
-						msg->task.local_node = tnid;
-						break;
-					}
-				}
-			}
-			else if (msg->task.locality == LOCAL_LENGTH)
-			{
-				do {
-					node_map_t::iterator it = block->local_node.begin();
-					std::advance(it, uniform_int(0, block->local_node.size() - 1));
-					nptr = it->second;
-				} while (nptr->state == STATE_STANDBY || nptr->state == STATE_ACTIVATE || nptr->state == STATE_DEACTIVATE);
-				msg->task.split_index = i;
-				msg->task.locality = LOCAL_REMOTE;
-				msg->task.local_node = nptr->id;
-			}
+			// local rack
+			std::map<long, std::map<long, long>>::iterator nit = job->map_splits[rack].begin();
+			std::advance(nit, uniform_int(0, job->map_splits[rack].size() - 1));
+			msg->task.block = GetBlock(nit->second.begin()->first);
+			msg->task.locality = LOCAL_RACK;
+			msg->task.local_node = nit->first;
 		}
+		else
+		{
+			// local remote
+			std::map<long, std::map<long, std::map<long, long>>>::iterator rit = job->map_splits.begin();
+			std::advance(rit, uniform_int(0, job->map_splits.size() - 1));
+			std::map<long, std::map<long, long>>::iterator nit = rit->second.begin();
+			std::advance(nit, uniform_int(0, rit->second.size() - 1));
+			msg->task.block = GetBlock(nit->second.begin()->first);
+			msg->task.locality = LOCAL_REMOTE;
+			msg->task.local_node = nit->first;
+		}
+
 		if (SETUP_SCHEDULER_TYPE == FAIR_SCHEDULER
 			&& msg->task.locality != LOCAL_LENGTH)
 		{
@@ -103,11 +92,14 @@ msg_t * scheduler(long node)
 			// <ref> Zaharia, Matei, et al. "Delay scheduling: a simple technique for achieving locality and fairness in cluster scheduling." Proceedings of the 5th European conference on Computer systems. ACM, 2010. </ref>
 			double gamma = 0.95;
 			long N = job->map_splits.size();
-			double R = (double)ACTIVE_NODE_SET.size() / CS_NODE_NUM;
 			long M = ACTIVE_NODE_SET.size();
-			double D = -(M / R) * log(((1 - gamma) * N) / (1 + (1 - gamma) * N));
-			if (msg->task.locality == LOCAL_NODE
-				|| (skipcount >= (long)ceil(D) && msg->task.locality != LOCAL_LENGTH))
+			double R = (double)M / CS_NODE_NUM;
+			double D = (double)-(M / R) * log(((1 - gamma) * N) / (1 + (1 - gamma) * N));
+			if (job->skipcount >= (long)ceil(D / 2) && msg->task.locality == LOCAL_RACK)
+			{
+				return msg;
+			}
+			if (job->skipcount >= (long)ceil(D) && msg->task.locality != LOCAL_LENGTH)
 			{
 				return msg;
 			}

@@ -10,83 +10,70 @@ std::list<job_t*> MAP_QUEUE;
 extern bool CSIM_END;
 extern std::vector<file_t*> FILE_VEC[CS_RACK_NUM];
 extern double SETUP_DATA_SKEW;
+extern long REPORT_MAP_TASKS;
 
 void scenario(void)
 {
 	create("scenario");
-	while (true)
-	{
-		if (clock == 0)
-		{
-			LOAD_PHASE_GROWING = true;
-			LOAD_INTERVAL = 80;
-		}
-		else if (clock == 0.5 * HOUR)
-		{
-			LOAD_PHASE_GROWING = true;
-			if (0.0 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.25)
-			{
-				LOAD_INTERVAL = 38;
-			}
-			else if (0.25 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.5)
-			{
-				LOAD_INTERVAL = 39;
-			}
-			else if (0.5 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.75)
-			{
-				LOAD_INTERVAL = 40;
-			}
-			else if (0.75 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 1.0)
-			{
-				LOAD_INTERVAL = 41;
-			}
-			else if (1.0 <= SETUP_DATA_SKEW)
-			{
-				LOAD_INTERVAL = 42;
-			}
-		}
-		else if (clock == 2.0 * HOUR)
-		{
-			LOAD_PHASE_GROWING = false;
-			LOAD_INTERVAL += 3;
-		}
-		else if (clock == 3.0 * HOUR)
-		{
-			LOAD_PHASE_GROWING = true;
-			if (0.0 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.25)
-			{
-				LOAD_INTERVAL = 22;
-			}
-			else if (0.25 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.5)
-			{
-				LOAD_INTERVAL = 23;
-			}
-			else if (0.5 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.75)
-			{
-				LOAD_INTERVAL = 24;
-			}
-			else if (0.75 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 1.0)
-			{
-				LOAD_INTERVAL = 25;
-			}
-			else if (1.0 <= SETUP_DATA_SKEW)
-			{
-				LOAD_INTERVAL = 26;
-			}
-		}
-		else if (clock == 4.5 * HOUR)
-		{
-			LOAD_PHASE_GROWING = false;
-			LOAD_INTERVAL = 80;
-		}
-		else if (clock == 5.0 * HOUR)
-		{
-			CSIM_END = true;
-			break;
-		}
+	LOAD_PHASE_GROWING = true;
+	LOAD_INTERVAL = 80;
+	hold(1.0 * HOUR);
 
-		hold(MINUTE);
+	LOAD_PHASE_GROWING = true;
+	if (0.0 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.25)
+	{
+		LOAD_INTERVAL = 38;
 	}
+	else if (0.25 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.5)
+	{
+		LOAD_INTERVAL = 39;
+	}
+	else if (0.5 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.75)
+	{
+		LOAD_INTERVAL = 40;
+	}
+	else if (0.75 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 1.0)
+	{
+		LOAD_INTERVAL = 41;
+	}
+	else if (1.0 <= SETUP_DATA_SKEW)
+	{
+		LOAD_INTERVAL = 42;
+	}
+	hold(3.0 * HOUR);
+
+	LOAD_PHASE_GROWING = false;
+	LOAD_INTERVAL += 3;
+	hold(1.0 * HOUR);
+
+	LOAD_PHASE_GROWING = true;
+	if (0.0 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.25)
+	{
+		LOAD_INTERVAL = 24;
+	}
+	else if (0.25 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.5)
+	{
+		LOAD_INTERVAL = 25;
+	}
+	else if (0.5 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.75)
+	{
+		LOAD_INTERVAL = 26;
+	}
+	else if (0.75 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 1.0)
+	{
+		LOAD_INTERVAL = 27;
+	}
+	else if (1.0 <= SETUP_DATA_SKEW)
+	{
+		LOAD_INTERVAL = 28;
+	}
+	hold(3.0 * HOUR);
+
+	LOAD_PHASE_GROWING = false;
+	LOAD_INTERVAL = 80;
+	hold(1.0 * HOUR);
+
+	CSIM_END = true;
 }
 
 void workload(void)
@@ -109,8 +96,11 @@ void workload(void)
 		job->time.qtotal = 0;
 		job->map_total = 0;
 		job->skipcount = 0;	// for delay scheduler
+		job->run_total = 0;
+		job->map_splits.clear();
+		job->map_cascade.clear();
 
-		while (job->map_splits.size() < JOB_MAP_TASK_NUM)
+		while (job->map_total < JOB_MAP_TASK_NUM)
 		{
 			n = rand_zipf();
 			max = FILE_VEC[n].size() - 1;
@@ -119,11 +109,23 @@ void workload(void)
 
 			for (iter = file->blocks.begin(); iter != file->blocks.end(); ++iter)
 			{
-				job->map_splits.push_back(*iter);
+				block_t *b = *iter;
+				node_map_t::iterator it = b->local_node.begin(), itend = b->local_node.end();
+				while (it != itend)
+				{
+					long tn = it->first;
+					long tr = GET_RACK_FROM_NODE(tn);
+					job->map_splits[tr][tn][b->id] = job->map_splits[tr][tn][b->id] + 1;
+					job->map_cascade[b->id][tn] = tr;
+
+					++it;
+				}
 				++job->map_total;
 			}
 		}
+
 		REMAIN_MAP_TASKS += job->map_total;
+		REPORT_MAP_TASKS += job->map_total;
 		JOB_MAP[MAX_JOB_ID] = job;
 		++MAX_JOB_ID;
 		MAP_QUEUE.push_back(job);

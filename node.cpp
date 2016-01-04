@@ -15,7 +15,6 @@ extern mailbox *M_MAPPER[MAP_SLOTS_MAX], *M_NODE[NODE_NUM];
 extern table *T_CACHE_HIT, *T_CACHE_MISS;
 extern long REPORT_NODE_STATE_COUNT[STATE_LENGTH];
 extern long MANAGER_MAP_SLOT_CAPACITY;
-//extern std::vector<long> HEARTBEAT;
 extern node_map_t HEARTBEAT;
 extern bool MANAGER_CS[NODE_NUM];
 extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
@@ -64,13 +63,12 @@ void init_node(void)
 		}
 
 		if (SETUP_MODE_TYPE == MODE_BASELINE || i < CS_NODE_NUM) {
-			pnode->state = STATE_IDLE;
+			pnode->state = STATE_ACTIVE;
 			prack->active_node_set[i] = pnode;
 			ACTIVE_NODE_SET[i] = pnode;
 			MANAGER_MAP_SLOT_CAPACITY += MAP_SLOTS;
-			HEARTBEAT[i] = &NODES[i];
+			HEARTBEAT[i] = pnode;
 			MANAGER_CS[i] = true;
-			++REPORT_NODE_STATE_COUNT_PG[pnode->state];
 		}
 		else {
 			pnode->state = STATE_STANDBY;
@@ -162,29 +160,24 @@ void node(long id)
 			hold(NODE_U_TIME);
 
 			--REPORT_NODE_STATE_COUNT[my->state];
-			my->state = STATE_IDLE;
+			my->state = STATE_ACTIVE;
 			++REPORT_NODE_STATE_COUNT[my->state];
 			parent->active_node_set[id] = my;
 			ACTIVE_NODE_SET[id] = my;
 
 			HEARTBEAT[id] = my;
 		}
-		else if (r->power.power == false
-			&& (my->state == STATE_IDLE || my->state == STATE_PEAK))
+		else if (r->power.power == false && my->state == STATE_ACTIVE)
 		{
-			while (my->state == STATE_PEAK)		// wait until all work is completed
+			HEARTBEAT.erase(id);
+			while (my->mapper.used > 0)		// wait until all work is completed
 			{
 				hold(1.0);
 			}
 
-			if (HEARTBEAT.find(id) != HEARTBEAT.end())
-			{
-				HEARTBEAT.erase(id);
-			}
-
 			MEMORY[id].clear();
 			if (SETUP_MODE_TYPE == MODE_PCS && !my->space.budget.blocks.empty())
-			{
+			{	// clear budget
 				std::map<long, void*>::iterator it = my->space.budget.blocks.begin(),
 					itend = my->space.budget.blocks.end();
 				while (it != itend)

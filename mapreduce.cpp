@@ -1,6 +1,5 @@
 #include "header.h"
 
-//std::vector<long> HEARTBEAT;
 node_map_t HEARTBEAT;
 
 extern node_t NODES[NODE_NUM];
@@ -16,8 +15,9 @@ extern table *T_LOCALITY[LOCAL_LENGTH];
 extern long SETUP_MODE_TYPE;
 extern bool MANAGER_CS[NODE_NUM];
 extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
-extern double REPORT_RESP_T_TOTAL;
-extern long REPORT_RESP_T_COUNT;
+extern double REPORT_RESP_T_TOTAL, REPORT_Q_DELAY_T_TOTAL;
+extern long REPORT_RESP_T_COUNT, REPORT_Q_DELAY_T_COUNT;
+extern long REPORT_LOCALITY[LOCAL_LENGTH];
 
 void job_tracker(void)
 {
@@ -28,12 +28,17 @@ void job_tracker(void)
 	create("job_tracker");
 	while (!CSIM_END)
 	{
-		//std::vector<long> heartbeat, reuse;
 		node_map_t heartbeat, reuse;
 
 		if (MAP_QUEUE.empty() == false && HEARTBEAT.empty() == false)
 		{
 			heartbeat = HEARTBEAT;
+			for (node_map_t::iterator it = heartbeat.begin(); it != heartbeat.end(); NULL)
+			{
+				if (it->second->mapper.used == it->second->mapper.capacity)
+					heartbeat.erase(it++);
+				else ++it;
+			}
 		}
 
 		while ((heartbeat.empty() == false || reuse.empty() == false)
@@ -56,11 +61,6 @@ void job_tracker(void)
 				reuse[node->id] = node;
 				continue;
 			}
-			if (msg != NULL &&
-				(msg->task.split_index < 0 || msg->task.split_index >= msg->task.job->map_splits.size()))
-			{
-				msg = msg;
-			}
 
 			M_MAPPER[msg->task.id]->synchronous_send((long)msg);
 		}
@@ -77,6 +77,7 @@ void mapper(long id)
 	long rack = GET_RACK_FROM_NODE(node), local_rack;
 	long group = GET_G_FROM_RACK(rack);
 	double cpu_use_t;
+	node_t *parent = &NODES[node];
 	LocalTypes locality;
 	block_t *block;
 	file_t *file;
@@ -90,35 +91,51 @@ void mapper(long id)
 
 		job = r->task.job;
 		locality = r->task.locality;
-		if (job->running++ == 0)
-		{
-			double qdelay = abs(clock - job->time.qin);
-			job->time.qtotal += qdelay;
-			T_TASK_TIMES[O_QDELAY]->record(qdelay);
+		++job->running;
+		++job->run_total;
+
+		if (job->run_total > job->map_total)
+		{	// error check
+			job = job;
 		}
-		block = job->map_splits.at(r->task.split_index);
-		job->map_splits.erase(job->map_splits.begin() + r->task.split_index);
-		if (job->map_splits.size() == 0)
+
+		double qdelay = abs(clock - job->time.qin);
+		job->time.qin = clock;
+		job->time.qtotal += qdelay;
+		T_TASK_TIMES[O_QDELAY]->record(qdelay);
+
+		block = r->task.block;
+
+		// erase job split using cascade
+		for (long_map_t::iterator it = job->map_cascade[block->id].begin();
+			it != job->map_cascade[block->id].end();
+			++it)
+		{
+			long tn = it->first;
+			long tr = it->second;
+
+			job->map_splits[tr][tn][block->id] = job->map_splits[tr][tn][block->id] - 1;
+			if (job->map_splits[tr][tn][block->id] <= 0)
+			{
+				job->map_splits[tr][tn].erase(block->id);
+				if (job->map_splits[tr][tn].empty() == true)
+				{
+					job->map_splits[tr].erase(tn);
+					if (job->map_splits[tr].empty() == true)
+					{
+						job->map_splits.erase(tr);
+					}
+				}
+			}
+		}
+		
+		if (job->map_splits.empty() == true)
 		{
 			MAP_QUEUE.remove(job);
 		}
 		file = FILE_MAP[block->file_id];
 		++file->acc[job->id];
-		if (NODES[node].mapper.used++ == 0)
-		{
-			--REPORT_NODE_STATE_COUNT[NODES[node].state];
-			if (node < CS_NODE_NUM) --REPORT_NODE_STATE_COUNT_PG[NODES[node].state];
-			NODES[node].state = STATE_PEAK;
-			if (node < CS_NODE_NUM) ++REPORT_NODE_STATE_COUNT_PG[NODES[node].state];
-			++REPORT_NODE_STATE_COUNT[NODES[node].state];
-		}
-		if (NODES[node].mapper.used == NODES[node].mapper.capacity)
-		{
-			if (HEARTBEAT.find(node) != HEARTBEAT.end())
-			{
-				HEARTBEAT.erase(node);
-			}
-		}
+		++parent->mapper.used;
 		MAPPER[id].used = true;
 
 		if (locality == LOCAL_NODE)
@@ -175,24 +192,9 @@ void mapper(long id)
 			file->acc.erase(job->id);
 		}
 		MAPPER[id].used = false;
-		if (--NODES[node].mapper.used == 0)
-		{
-			--REPORT_NODE_STATE_COUNT[NODES[node].state];
-			if (node < CS_NODE_NUM) --REPORT_NODE_STATE_COUNT_PG[NODES[node].state];
-			NODES[node].state = STATE_IDLE;
-			if (node < CS_NODE_NUM) ++REPORT_NODE_STATE_COUNT_PG[NODES[node].state];
-			++REPORT_NODE_STATE_COUNT[NODES[node].state];
-		}
-		if ((MANAGER_CS[node] == true)
-			&& (NODES[node].mapper.used + 1 == NODES[node].mapper.capacity))
-		{
-			HEARTBEAT[node] = &NODES[node];
-		}
-		if (--job->running == 0 && job->map_splits.size() > 0)
-		{
-			job->time.qin = clock; // queue wait start
-		}
-		if (job->running == 0 && job->map_splits.size() == 0)
+		--parent->mapper.used;
+
+		if (--job->running == 0 && job->map_splits.empty() == true)
 		{
 			// complete job
 			job->time.end = clock;
@@ -201,7 +203,11 @@ void mapper(long id)
 			T_QDELAY_TIME->record(job->time.qtotal);
 			REPORT_RESP_T_TOTAL += turnaround_t;
 			++REPORT_RESP_T_COUNT;
+			REPORT_Q_DELAY_T_TOTAL += job->time.qtotal;
+			++REPORT_Q_DELAY_T_COUNT;
 		}
+
+		++REPORT_LOCALITY[locality];
 		T_LOCALITY[locality]->record(1.0);
 		--REMAIN_MAP_TASKS;
 

@@ -12,11 +12,10 @@
 // node
 #define NODE_NUM 				1200
 #define CS_NODE_NUM 			(NODE_NUM / REPLICATION_FACTOR)
-#define NODE_I_POWER			259.5		// IDLE
 #define NODE_U_POWER			129.0		// ACTIVATE
 #define NODE_D_POWER			129.0		// DEACTIVATE
 #define NODE_S_POWER			18.0		// STANDBY
-#define NODE_P_POWER			315.0		// PEAK
+#define NODE_A_POWER			315.0		// ACTIVE
 #define NODE_U_TIME				100.0		// ACTIVATING TIME (sec)
 #define NODE_D_TIME				11.0		// DEACTIVATING TIME (sec)
 #define MAP_SLOTS				8			// HP(Xeon)

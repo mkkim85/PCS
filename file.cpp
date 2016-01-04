@@ -10,7 +10,8 @@ extern node_t NODES[NODE_NUM];
 extern rack_t RACKS[RACK_NUM];
 extern std::list<long_map_t> FILE_ACC_H;
 extern long SETUP_MODE_TYPE;
-extern std::priority_queue<rack_t, std::vector<rack_t>, rank_cmp> MANAGER_RANK;
+extern std::list<rack_t*> MANAGER_RANK;
+//extern std::priority_queue<rack_t, std::vector<rack_t>, rank_cmp> MANAGER_RANK;
 extern long MANAGER_BAG_SIZE;
 
 void gen_file(void)
@@ -169,10 +170,15 @@ long_map_t* GetPopularBlockList(long *top_k)
 	{
 		if (SETUP_MODE_TYPE == MODE_PCS)
 		{
-			MANAGER_RANK = std::priority_queue<rack_t, std::vector<rack_t>, rank_cmp>();    // reset
+			//MANAGER_RANK = std::priority_queue<rack_t, std::vector<rack_t>, rank_cmp>();    // reset
+			//for (long i = CS_RACK_NUM; i < RACK_NUM; ++i)
+			//{
+			//	MANAGER_RANK.push(RACKS[i]);
+			//}
+			MANAGER_RANK.clear();
 			for (long i = CS_RACK_NUM; i < RACK_NUM; ++i)
 			{
-				MANAGER_RANK.push(RACKS[i]);
+				MANAGER_RANK.push_back(&RACKS[i]);
 			}
 		}
 

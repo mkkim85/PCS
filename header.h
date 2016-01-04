@@ -14,6 +14,7 @@ void init(void);
 void logging(char str[]);
 
 // main.cpp
+// extern "C" FILE * __cdecl __iob_func(void)
 // extern "C" void sim(void)
 
 // manager.cpp
@@ -23,6 +24,7 @@ long_map_t * FindiPACS(bool cs[], long_map_t *bag, long top_k, long req_m);
 long_map_t * FindRCS(bool cs[], long req_m);
 long_map_t * FindPCS(bool cs[], long_map_t *bag, long req_m);
 void ActivateNodes(bool cs[], long_map_t *bag);
+bool sort_rank(const rack_t *x, const rack_t *y);
 
 // mapreduce.cpp
 void job_tracker(void);

@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include "cpp.h"
 
-typedef enum { STATE_ACTIVATE, STATE_DEACTIVATE, STATE_STANDBY, STATE_IDLE, STATE_PEAK, STATE_ACTIVE, STATE_LENGTH } StateTypes;
+typedef enum { STATE_ACTIVATE, STATE_DEACTIVATE, STATE_STANDBY, STATE_ACTIVE, STATE_LENGTH } StateTypes;
 typedef enum { O_CPU, O_MEMORY, O_DISK, O_NETWORK, O_QDELAY, O_LENGTH } OverheadTypes;
 typedef enum { LOCAL_NODE, LOCAL_RACK, LOCAL_REMOTE, LOCAL_LENGTH } LocalTypes;
 typedef enum { MODE_BASELINE, MODE_SIERRA, MODE_IPACS, MODE_RCS, MODE_PCS, MODE_LENGTH } ModeTypes;
@@ -79,13 +79,16 @@ struct file_t
 	long_map_t acc;
 };
 
+
 struct job_t
 {
 	long id;
 	long running;
+	long run_total;
 	long map_total;
 	long skipcount;
-	std::vector<block_t*> map_splits;
+	std::map<long, std::map<long, long_map_t>> map_splits;
+	std::map<long, long_map_t> map_cascade;
 	struct {
 		double begin;
 		double end;
@@ -100,7 +103,7 @@ union msg_t
 		long id;
 		LocalTypes locality;
 		long local_node;
-		long split_index;
+		block_t *block;
 		job_t *job;
 	} task;
 	struct {
@@ -108,9 +111,9 @@ union msg_t
 	} power;
 };
 
-struct rank_cmp {
-	bool operator() (const rack_t x, const rack_t y)
-	{
-		return x.rank < y.rank;
-	}
-};
+//struct rank_cmp {
+//	bool operator() (const rack_t x, const rack_t y)
+//	{
+//		return x.rank < y.rank;
+//	}
+//};

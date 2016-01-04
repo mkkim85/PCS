@@ -9,7 +9,7 @@ long MANAGER_BAG_SIZE, MANAGER_BUDGET_SIZE;
 node_map_t MANAGER_CS_NODES;
 std::list<long> INCOMPLETE_MAP_TASKS_Q;
 std::list<long_map_t> FILE_ACC_H;
-std::priority_queue<rack_t, std::vector<rack_t>, rank_cmp> MANAGER_RANK;
+std::list<rack_t*> MANAGER_RANK;
 std::map<long, std::map<long, std::list<long>>> MANAGER_BUDGET_MAP;
 
 extern node_t NODES[NODE_NUM];
@@ -72,7 +72,9 @@ void state_manager(void)
 				|| ((m / mcap < 1 - SETUP_BETA) && (ACTIVE_NODE_SET.size() > CS_NODE_NUM) && (LOAD_PHASE_GROWING == false)))
 			{
 				stable = false;
-				req_m = m - (CS_NODE_NUM * MAP_SLOTS);
+				//req_m = m - (CS_NODE_NUM * MAP_SLOTS);
+				//req_m = (REMAIN_MAP_TASKS * 1.1) - (CS_NODE_NUM * MAP_SLOTS);
+				req_m = REMAIN_MAP_TASKS - (CS_NODE_NUM * MAP_SLOTS);
 				bag = GetPopularBlockList(&top_k);
 
 				if (SETUP_MODE_TYPE == MODE_SIERRA)
@@ -110,7 +112,7 @@ long_map_t* FindSierra(bool cs[], long top_k, long req_m)
 
 	for (g = 1; g < REPLICATION_FACTOR; ++g)
 	{
-		if (req_m <= 0 && top_k-- <= 1)
+		if (req_m <= 0 && (top_k-- <= 1 || LOAD_PHASE_GROWING == false))
 		{
 			break;
 		}
@@ -134,7 +136,7 @@ long_map_t* FindiPACS(bool cs[], long_map_t *bag, long top_k, long req_m)
 
 	top_k = MIN(top_k, REPLICATION_FACTOR) - 1;
 
-	if (bag != NULL)
+	if (bag != NULL && LOAD_PHASE_GROWING == true)
 	{
 		long_map_t::iterator iter;
 		for (iter = bag->begin(); iter != bag->end(); bag->erase(iter++))
@@ -202,6 +204,7 @@ long_map_t* FindRCS(bool cs[], long req_m)
 
 long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 {
+	bool sorted = false;
 	long i, budget_size = 0, bag_size = MANAGER_BAG_SIZE;
 	node_t *node;
 	rack_t *rack;
@@ -216,8 +219,14 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 	{
 		if (!bag->empty())
 		{
-			i = MANAGER_RANK.top().id;
-			MANAGER_RANK.pop();
+			if (sorted == false)
+			{
+				sorted = true;
+				MANAGER_RANK.sort(sort_rank);
+			}
+
+			i = MANAGER_RANK.front()->id;
+			MANAGER_RANK.pop_front();
 		}
 		else if (!F_INTERSECT_RACTIVE.empty())
 		{
@@ -508,7 +517,7 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 		}
 		else
 		{	// turn off nodes
-			if (NODES[i].state == STATE_IDLE || NODES[i].state == STATE_PEAK)
+			if (NODES[i].state == STATE_ACTIVE)
 			{
 				msg = new msg_t;
 				msg->power.power = false;
@@ -516,4 +525,9 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 			}
 		}
 	}
+}
+
+bool sort_rank(const rack_t *x, const rack_t *y)
+{
+	return x->rank > y->rank;
 }
