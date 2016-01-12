@@ -64,6 +64,8 @@ msg_t * scheduler(long node)
 			msg->task.block = GetBlock(nit->second.begin()->first);
 			msg->task.locality = LOCAL_RACK;
 			msg->task.local_node = nit->first;
+			job->skipcount = 0;
+			return msg;
 		}
 		else
 		{
@@ -95,10 +97,6 @@ msg_t * scheduler(long node)
 			long M = ACTIVE_NODE_SET.size();
 			double R = (double)M / CS_NODE_NUM;
 			double D = (double)-(M / R) * log(((1 - gamma) * N) / (1 + (1 - gamma) * N));
-			if (job->skipcount >= (long)ceil(D / 2) && msg->task.locality == LOCAL_RACK)
-			{
-				return msg;
-			}
 			if (job->skipcount >= (long)ceil(D) && msg->task.locality != LOCAL_LENGTH)
 			{
 				return msg;

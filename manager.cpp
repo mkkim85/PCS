@@ -3,7 +3,6 @@
 bool MANAGER_CS[NODE_NUM] = { false, };
 bool MANAGER_CS_RACKS[RACK_NUM] = { false, };
 bool stable = true;
-long MANAGER_MAP_SLOT_CAPACITY;
 long MANAGER_NODE_NUM;
 long MANAGER_BAG_SIZE, MANAGER_BUDGET_SIZE;
 node_map_t MANAGER_CS_NODES;
@@ -16,7 +15,6 @@ extern node_t NODES[NODE_NUM];
 extern rack_t RACKS[RACK_NUM];
 extern long REMAIN_MAP_TASKS;
 extern bool CSIM_END;
-extern bool LOAD_PHASE_GROWING;
 extern long SETUP_TIME_WINDOW;
 extern double SETUP_ALPHA;
 extern double SETUP_BETA;
@@ -30,7 +28,7 @@ void state_manager(void)
 {
 	double m, mcap;
 	long stable_t = clock;
-	long req_m, top_k, size;
+	long req_m, top_k = 0, size;
 	long m_total = 0;
 	long_map_t *bag = NULL;
 
@@ -62,20 +60,17 @@ void state_manager(void)
 		m_total += REMAIN_MAP_TASKS;
 		INCOMPLETE_MAP_TASKS_Q.push_back(REMAIN_MAP_TASKS);
 
-		if (stable && size >= SETUP_TIME_WINDOW
-			&& ((long)(clock - stable_t) >= (long)MODE_TRANS_INTERVAL))
+		if (stable == true && size >= SETUP_TIME_WINDOW
+			&& (long)clock - stable_t >= (long)MODE_TRANS_INTERVAL)
 		{
 			m = (double)m_total / (double)SETUP_TIME_WINDOW;
-			mcap = MANAGER_MAP_SLOT_CAPACITY;
+			mcap = ACTIVE_NODE_SET.size() * MAP_SLOTS;
 
-			if (((m / mcap >= 1 + SETUP_ALPHA) && (STANDBY_NODE_SET.empty() == false) && (LOAD_PHASE_GROWING == true))
-				|| ((m / mcap < 1 - SETUP_BETA) && (ACTIVE_NODE_SET.size() > CS_NODE_NUM) && (LOAD_PHASE_GROWING == false)))
+			if ((m / mcap >= 1 + SETUP_ALPHA && STANDBY_NODE_SET.size() > 0)
+				|| (m / mcap < 1 - SETUP_BETA && ACTIVE_NODE_SET.size() > CS_NODE_NUM))
 			{
 				stable = false;
-				//req_m = m - (CS_NODE_NUM * MAP_SLOTS);
-				//req_m = (REMAIN_MAP_TASKS * 1.1) - (CS_NODE_NUM * MAP_SLOTS);
-				req_m = REMAIN_MAP_TASKS - (CS_NODE_NUM * MAP_SLOTS);
-				bag = GetPopularBlockList(&top_k);
+				req_m = m - (CS_NODE_NUM * MAP_SLOTS);
 
 				if (SETUP_MODE_TYPE == MODE_SIERRA)
 				{
@@ -83,6 +78,7 @@ void state_manager(void)
 				}
 				else if (SETUP_MODE_TYPE == MODE_IPACS)
 				{
+					bag = GetPopularBlockList(&top_k);
 					bag = FindiPACS(MANAGER_CS, bag, top_k, req_m);
 				}
 				else if (SETUP_MODE_TYPE == MODE_RCS)
@@ -91,10 +87,12 @@ void state_manager(void)
 				}
 				else if (SETUP_MODE_TYPE == MODE_PCS)
 				{
+					bag = GetPopularBlockList(&top_k);
 					bag = FindPCS(MANAGER_CS, bag, req_m);
 				}
 
 				ActivateNodes(MANAGER_CS, bag);
+					
 			}
 		}
 
@@ -105,22 +103,28 @@ void state_manager(void)
 long_map_t* FindSierra(bool cs[], long top_k, long req_m)
 {
 	long g, node;
+	memset(&MANAGER_CS, false, sizeof(bool) * NODE_NUM);
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
-	memset(&MANAGER_CS[CS_NODE_NUM], false, sizeof(bool) * NODE_NUM - CS_NODE_NUM);
-
-	top_k = MIN(top_k, REPLICATION_FACTOR) - 1;
 
 	for (g = 1; g < REPLICATION_FACTOR; ++g)
 	{
-		if (req_m <= 0 && (top_k-- <= 1 || LOAD_PHASE_GROWING == false))
+		node_map_t S;
+		S.clear();
+		for (node = CS_NODE_NUM * g; node < CS_NODE_NUM * (g + 1); ++node)
 		{
-			break;
+			S[node] = &NODES[node];
 		}
-
-		for (node = g * CS_NODE_NUM; node < (g + 1) * CS_NODE_NUM; ++node)
+		while (req_m > 0 && S.size() > 0)
 		{
-			cs[node] = true;
-			req_m -= MAP_SLOTS;
+			node_map_t::iterator item = S.begin();
+			std::advance(item, uniform_int(0, S.size() - 1));
+			node = item->first;
+			if (MANAGER_CS[node] == false)
+			{
+				MANAGER_CS[node] = true;
+				req_m = req_m - MAP_SLOTS;
+			}
+			S.erase(item);
 		}
 	}
 
@@ -129,42 +133,48 @@ long_map_t* FindSierra(bool cs[], long top_k, long req_m)
 
 long_map_t* FindiPACS(bool cs[], long_map_t *bag, long top_k, long req_m)
 {
-	long g, node;
+	long node;
+	memset(&MANAGER_CS, false, sizeof(bool) * NODE_NUM);
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
-	memset(&MANAGER_CS[CS_NODE_NUM], false, sizeof(bool)* NODE_NUM - CS_NODE_NUM);
-	block_t *block;
 
 	top_k = MIN(top_k, REPLICATION_FACTOR) - 1;
 
-	if (bag != NULL && LOAD_PHASE_GROWING == true)
+	if (top_k > 0)
 	{
 		long_map_t::iterator iter;
 		for (iter = bag->begin(); iter != bag->end(); bag->erase(iter++))
 		{
 			long cnt = top_k;
-			block = GetBlock(iter->first);
+			block_t *block = GetBlock(iter->first);
 			node_map_t::iterator item = block->local_node.begin();
 			while (cnt--)
 			{
 				++item;
-				node = item->second->id;
-				if (cs[node] == false)
+				node = item->first;
+				if (MANAGER_CS[node] == false)
 				{
-					cs[node] = true;
-					req_m -= MAP_SLOTS;
+					MANAGER_CS[node] = true;
+					req_m = req_m - MAP_SLOTS;
 				}
 			}
 		}
 	}
 
-	node_map_t S = STANDBY_NODE_SET;
+	node_map_t S;
+	S.clear();
+	for (long i = CS_NODE_NUM; i < NODE_NUM; i++)
+		S[i] = &NODES[i];
+
 	while (req_m > 0 && !S.empty())
 	{
 		node_map_t::iterator item = S.begin();
 		std::advance(item, uniform_int(0, S.size() - 1));
-		node = item->second->id;
-		cs[node] = true;
-		req_m -= MAP_SLOTS;
+		node = item->first;
+		if (MANAGER_CS[node] == false)
+		{
+			MANAGER_CS[node] = true;
+			req_m = req_m - MAP_SLOTS;
+		}
 		S.erase(item);
 	}
 
@@ -175,11 +185,11 @@ long_map_t* FindRCS(bool cs[], long req_m)
 {
 	long g, node;
 	rack_t *rack;
+	memset(&MANAGER_CS, false, sizeof(bool) * NODE_NUM);
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
-	memset(&MANAGER_CS[CS_NODE_NUM], false, sizeof(bool)* NODE_NUM - CS_NODE_NUM);
 
 	rack_map_t S = NPG_SET;
-	while (req_m > 0 && S.size() > 0)
+	while (req_m > 0 && S.empty() == false)
 	{
 		rack_map_t::iterator ritem = S.begin();
 		std::advance(ritem, uniform_int(0, S.size() - 1));
@@ -190,10 +200,10 @@ long_map_t* FindRCS(bool cs[], long req_m)
 		long nend = node + NODE_NUM_IN_RACK;
 		while (req_m > 0 && node < nend)
 		{
-			if (cs[node] == false)
+			if (MANAGER_CS[node] == false)
 			{
-				cs[node] = true;
-				req_m -= MAP_SLOTS;
+				MANAGER_CS[node] = true;
+				req_m = req_m - MAP_SLOTS;
 			}
 			++node;
 		}
@@ -210,10 +220,10 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 	rack_t *rack;
 	rack_map_t F = NPG_SET;
 	rack_map_t F_INTERSECT_RACTIVE = ACTIVE_RACK_NPG_SET;
+	memset(&MANAGER_CS, false, sizeof(bool) * NODE_NUM);
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
-	memset(&MANAGER_CS[CS_NODE_NUM], false, sizeof(bool) * NODE_NUM - CS_NODE_NUM);
+	memset(&MANAGER_CS_RACKS, false, sizeof(bool) * RACK_NUM);
 	memset(&MANAGER_CS_RACKS, true, sizeof(bool) * CS_RACK_NUM);
-	memset(&MANAGER_CS_RACKS[CS_RACK_NUM], false, sizeof(bool) * RACK_NUM - CS_RACK_NUM);
 
 	while ((req_m > 0 || !bag->empty()) && !F.empty())
 	{
@@ -251,11 +261,11 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 		while (nid < nend)
 		{
 			node = &NODES[nid];
-			if (cs[node->id] == false)
+			if (MANAGER_CS[node->id] == false)
 			{
 				MANAGER_CS_NODES[node->id] = node;
-				cs[node->id] = true;
-				req_m -= MAP_SLOTS;
+				MANAGER_CS[node->id] = true;
+				req_m = req_m - MAP_SLOTS;
 				
 				// Invalidate replicas of n's storage budget that are not appeared in bag;
 				std::map<long, void*>::iterator itr = node->space.budget.blocks.begin(),
@@ -334,7 +344,6 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 {
 	long i;
 	MANAGER_NODE_NUM = CS_NODE_NUM;
-	MANAGER_MAP_SLOT_CAPACITY = CS_NODE_NUM * MAP_SLOTS;
 	msg_t *msg;
 
 	if (SETUP_MODE_TYPE == MODE_PCS && bag != NULL)
@@ -351,7 +360,7 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 				{
 					node = &NODES[node->id + 1];
 					MANAGER_CS_NODES[node->id] = node;
-					cs[node->id] = true;
+					MANAGER_CS[node->id] = true;
 					std::map<long, void*>::iterator itr = node->space.budget.blocks.begin(), iend = node->space.budget.blocks.end();
 					while (itr != iend)
 					{
@@ -503,7 +512,7 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 
 	for (i = CS_NODE_NUM; i < NODE_NUM; ++i)
 	{
-		if (cs[i] == true)
+		if (MANAGER_CS[i] == true)
 		{	// turn on nodes
 			if (NODES[i].state == STATE_STANDBY)
 			{
@@ -512,7 +521,6 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 				M_NODE[i]->send((long)msg);
 			}
 
-			MANAGER_MAP_SLOT_CAPACITY += MAP_SLOTS;
 			++MANAGER_NODE_NUM;
 		}
 		else

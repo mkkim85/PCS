@@ -14,7 +14,6 @@ extern facility_ms *FM_CPU[NODE_NUM], *FM_DISK[NODE_NUM];
 extern mailbox *M_MAPPER[MAP_SLOTS_MAX], *M_NODE[NODE_NUM];
 extern table *T_CACHE_HIT, *T_CACHE_MISS;
 extern long REPORT_NODE_STATE_COUNT[STATE_LENGTH];
-extern long MANAGER_MAP_SLOT_CAPACITY;
 extern node_map_t HEARTBEAT;
 extern bool MANAGER_CS[NODE_NUM];
 extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
@@ -66,7 +65,6 @@ void init_node(void)
 			pnode->state = STATE_ACTIVE;
 			prack->active_node_set[i] = pnode;
 			ACTIVE_NODE_SET[i] = pnode;
-			MANAGER_MAP_SLOT_CAPACITY += MAP_SLOTS;
 			HEARTBEAT[i] = pnode;
 			MANAGER_CS[i] = true;
 		}
@@ -74,6 +72,7 @@ void init_node(void)
 			pnode->state = STATE_STANDBY;
 			prack->standby_node_set[i] = pnode;
 			STANDBY_NODE_SET[i] = pnode;
+			MANAGER_CS[i] = false;
 		}
 		++REPORT_NODE_STATE_COUNT[pnode->state];
 

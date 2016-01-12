@@ -1,9 +1,9 @@
 #include "header.h"
 
-bool LOAD_PHASE_GROWING = true;
+double LOAD_SCENARIO[] = { 170.666666666667, 78.7692307692308, 102.4, 51.2, 170.666666666667 };
 long REMAIN_MAP_TASKS;
 long MAX_JOB_ID;
-double LOAD_INTERVAL;
+double INTERVAL_MEAN;
 std::map<long, job_t*> JOB_MAP;
 std::list<job_t*> MAP_QUEUE;
 
@@ -15,63 +15,20 @@ extern long REPORT_MAP_TASKS;
 void scenario(void)
 {
 	create("scenario");
-	LOAD_PHASE_GROWING = true;
-	LOAD_INTERVAL = 80;
-	hold(1.0 * HOUR);
+	INTERVAL_MEAN = LOAD_SCENARIO[0];
+	hold(1.5 * HOUR);
 
-	LOAD_PHASE_GROWING = true;
-	if (0.0 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.25)
-	{
-		LOAD_INTERVAL = 38;
-	}
-	else if (0.25 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.5)
-	{
-		LOAD_INTERVAL = 39;
-	}
-	else if (0.5 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.75)
-	{
-		LOAD_INTERVAL = 40;
-	}
-	else if (0.75 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 1.0)
-	{
-		LOAD_INTERVAL = 41;
-	}
-	else if (1.0 <= SETUP_DATA_SKEW)
-	{
-		LOAD_INTERVAL = 42;
-	}
+	INTERVAL_MEAN = LOAD_SCENARIO[1];
 	hold(3.0 * HOUR);
 
-	LOAD_PHASE_GROWING = false;
-	LOAD_INTERVAL += 3;
-	hold(1.0 * HOUR);
+	INTERVAL_MEAN = LOAD_SCENARIO[2];
+	hold(1.5 * HOUR);
 
-	LOAD_PHASE_GROWING = true;
-	if (0.0 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.25)
-	{
-		LOAD_INTERVAL = 24;
-	}
-	else if (0.25 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.5)
-	{
-		LOAD_INTERVAL = 25;
-	}
-	else if (0.5 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 0.75)
-	{
-		LOAD_INTERVAL = 26;
-	}
-	else if (0.75 <= SETUP_DATA_SKEW && SETUP_DATA_SKEW < 1.0)
-	{
-		LOAD_INTERVAL = 27;
-	}
-	else if (1.0 <= SETUP_DATA_SKEW)
-	{
-		LOAD_INTERVAL = 28;
-	}
+	INTERVAL_MEAN = LOAD_SCENARIO[3];
 	hold(3.0 * HOUR);
 
-	LOAD_PHASE_GROWING = false;
-	LOAD_INTERVAL = 80;
-	hold(1.0 * HOUR);
+	INTERVAL_MEAN = LOAD_SCENARIO[4];
+	hold(1.5 * HOUR);
 
 	CSIM_END = true;
 }
@@ -79,7 +36,6 @@ void scenario(void)
 void workload(void)
 {
 	long i, n, max;
-	double hold_t = 60;
 	file_t *file;
 	job_t *job;
 	std::vector<block_t*>::iterator iter;
@@ -88,7 +44,7 @@ void workload(void)
 	while (!CSIM_END)
 	{
 		job = new job_t;
-		job->id = MAX_JOB_ID;
+		job->id = MAX_JOB_ID++;
 		job->running = 0;
 		job->time.begin = clock;
 		job->time.end = 0;
@@ -124,10 +80,9 @@ void workload(void)
 			}
 		}
 
-		REMAIN_MAP_TASKS += job->map_total;
-		REPORT_MAP_TASKS += job->map_total;
-		JOB_MAP[MAX_JOB_ID] = job;
-		++MAX_JOB_ID;
+		REMAIN_MAP_TASKS += JOB_MAP_TASK_NUM;
+		REPORT_MAP_TASKS += JOB_MAP_TASK_NUM;
+		JOB_MAP[job->id] = job;
 		MAP_QUEUE.push_back(job);
 
 		if (LOGGING)
@@ -137,6 +92,9 @@ void workload(void)
 			logging(log);
 		}
 
-		hold(LOAD_INTERVAL);
+		double u = INTERVAL_MEAN;
+		double std = INTERVAL_MEAN * 0.05;
+		double t = normal(u, std);
+		hold(t);
 	}
 }

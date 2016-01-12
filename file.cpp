@@ -170,11 +170,6 @@ long_map_t* GetPopularBlockList(long *top_k)
 	{
 		if (SETUP_MODE_TYPE == MODE_PCS)
 		{
-			//MANAGER_RANK = std::priority_queue<rack_t, std::vector<rack_t>, rank_cmp>();    // reset
-			//for (long i = CS_RACK_NUM; i < RACK_NUM; ++i)
-			//{
-			//	MANAGER_RANK.push(RACKS[i]);
-			//}
 			MANAGER_RANK.clear();
 			for (long i = CS_RACK_NUM; i < RACK_NUM; ++i)
 			{

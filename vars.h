@@ -1,13 +1,13 @@
 // simulation parameters
 #define LOGGING					false
 #define REPLICATION_FACTOR		3
-#define MAP_COMPUTATION_TIME	200.0
+#define MAP_COMPUTATION_TIME	300.0
 #define JOB_MAP_TASK_NUM		1024
 #define DATA_BLOCK_NUM			(16 * 1024)		// 16n, 1TB
 #define TIME_UNIT				1.0
 #define MINUTE					60
 #define HOUR					(60 * MINUTE)
-#define MODE_TRANS_INTERVAL		(5 * MINUTE)
+#define MODE_TRANS_INTERVAL		(3 * MINUTE)
 
 // node
 #define NODE_NUM 				1200
@@ -29,11 +29,12 @@
 #define HEARTBEAT_PERIOD		1
 
 // rack
-#define RACK_NUM				60
+#define RACK_NUM				150
 #define CS_RACK_NUM				(RACK_NUM / REPLICATION_FACTOR)
 #define NODE_NUM_IN_RACK		(NODE_NUM / RACK_NUM)
 #define SWTICH_NUM				(NODE_NUM_IN_RACK * 1.5)
 #define RACK_POWER				5940.0		// 5.94 kW
+#define SWITCH_DELAY			0.1
 #define SWITCH_SPEED			0.05		// 0.05 s/block, 10 Gbps, 1.25 GB/s
 
 // setup

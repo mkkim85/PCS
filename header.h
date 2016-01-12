@@ -4,8 +4,8 @@
 // file.cpp
 void gen_file(void);
 long_map_t GetUnitOfFileAcc(void);
-long_map_t * GetPopularBlockList(long *top_k);
-block_t * GetBlock(long id);
+long_map_t* GetPopularBlockList(long *top_k);
+block_t* GetBlock(long id);
 
 // init.cpp
 void init(void);
@@ -19,10 +19,10 @@ void logging(char str[]);
 
 // manager.cpp
 void state_manager(void);
-long_map_t * FindSierra(bool cs[], long top_k, long req_m);
-long_map_t * FindiPACS(bool cs[], long_map_t *bag, long top_k, long req_m);
-long_map_t * FindRCS(bool cs[], long req_m);
-long_map_t * FindPCS(bool cs[], long_map_t *bag, long req_m);
+long_map_t* FindSierra(bool cs[], long top_k, long req_m);
+long_map_t* FindiPACS(bool cs[], long_map_t *bag, long top_k, long req_m);
+long_map_t* FindRCS(bool cs[], long req_m);
+long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m);
 void ActivateNodes(bool cs[], long_map_t *bag);
 bool sort_rank(const rack_t *x, const rack_t *y);
 
@@ -43,6 +43,7 @@ void node_disk(long id, long n);
 void init_rack(void);
 void turnon_rack(long id);
 void turnoff_rack(long id);
+void switch_rack(long from, long to);
 void switch_rack(long from, long to, long n);
 
 // report.cpp
@@ -50,7 +51,7 @@ void sim_report(void);
 
 // scheduler.cpp
 bool sort_queue(const job_t *x, const job_t *y);
-msg_t * scheduler(long node);
+msg_t* scheduler(long node);
 
 // setup.cpp
 void setup(void);

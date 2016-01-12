@@ -42,7 +42,6 @@ void init_rack(void)
 void turnon_rack(long id)
 {
 	rack_t *rack = &RACKS[id];
-	std::vector<rack_t*>::iterator finder;
 
 	if (rack->state == STATE_ACTIVE)
 	{
@@ -67,7 +66,6 @@ void turnon_rack(long id)
 void turnoff_rack(long id)
 {
 	rack_t *rack = &RACKS[id];
-	std::vector<rack_t*>::iterator finder;
 
 	if (rack->state == STATE_STANDBY)
 	{
@@ -89,8 +87,25 @@ void turnoff_rack(long id)
 	}
 }
 
-void switch_rack(long from, long to, long n)
+void switch_rack(long from, long to)
 {
+	if (from != to)
+	{
+		FM_RACK_SWTICH[from]->use(uniform(0, SWITCH_DELAY) * MAP_COMPUTATION_TIME);
+		F_MASTER_SWITCH->use(uniform(0, SWITCH_DELAY) * MAP_COMPUTATION_TIME);
+	}
+	FM_RACK_SWTICH[to]->use(uniform(0, SWITCH_DELAY) * MAP_COMPUTATION_TIME);
+
+	if (LOGGING)
+	{
+		char log[BUFSIZ];
+		sprintf(log, "%ld	<switch_rack>	%ld -> %ld\n", (long)clock, from, to);
+		logging(log);
+	}
+}
+
+void switch_rack(long from, long to, long n)
+{	// For budget data transfer
 	double t = SWITCH_SPEED * n;
 	if (from != to)
 	{

@@ -76,7 +76,6 @@ void mapper(long id)
 	long node = GET_NODE_FROM_MAPPER(id), local_node;
 	long rack = GET_RACK_FROM_NODE(node), local_rack;
 	long group = GET_G_FROM_RACK(rack);
-	double cpu_use_t;
 	node_t *parent = &NODES[node];
 	LocalTypes locality;
 	block_t *block;
@@ -93,11 +92,6 @@ void mapper(long id)
 		locality = r->task.locality;
 		++job->running;
 		++job->run_total;
-
-		if (job->run_total > job->map_total)
-		{	// error check
-			job = job;
-		}
 
 		double qdelay = abs(clock - job->time.qin);
 		job->time.qin = clock;
@@ -168,21 +162,13 @@ void mapper(long id)
 				node_disk(local_node, 1);				
 			}
 			mem_caching(local_node, block->id);
-			switch_rack(local_rack, rack, 1);
+			switch_rack(local_rack, rack);
 
 			T_TASK_TIMES[O_NETWORK]->record(abs(clock - network));
 		}
 
-		if (locality == LOCAL_NODE || locality == LOCAL_RACK)
-		{
-			cpu_use_t = (double)MAP_COMPUTATION_TIME / 2.0;		// 2x faster
-		}
-		else if (locality == LOCAL_REMOTE)
-		{
-			cpu_use_t = (double)MAP_COMPUTATION_TIME;
-		}
 		double cpu = clock;
-		node_cpu(node, cpu_use_t);
+		node_cpu(node, MAP_COMPUTATION_TIME);
 		T_TASK_TIMES[O_CPU]->record(abs(clock - cpu));
 
 		mem_caching(node, block->id);
