@@ -15,18 +15,15 @@ void init_rack(void)
 	long i;
 	rack_t *rack;
 
-	for (i = 0; i < RACK_NUM; ++i)
-	{
+	for (i = 0; i < RACK_NUM; ++i) {
 		rack = &RACKS[i];
 		rack->id = i;
 		rack->rank = 0;
-		if (SETUP_MODE_TYPE == MODE_BASELINE || i < CS_RACK_NUM)
-		{
+		if (SETUP_MODE_TYPE == MODE_BASELINE || i < CS_RACK_NUM) {
 			rack->state = STATE_ACTIVE;
 			ACTIVE_RACK_SET[i] = rack;
 		}
-		else
-		{
+		else {
 			rack->state = STATE_STANDBY;
 			STANDBY_RACK_SET[i] = rack;
 			NPG_SET[i] = rack;
@@ -43,8 +40,7 @@ void turnon_rack(long id)
 {
 	rack_t *rack = &RACKS[id];
 
-	if (rack->state == STATE_ACTIVE)
-	{
+	if (rack->state == STATE_ACTIVE) {
 		return;
 	}
 
@@ -55,8 +51,7 @@ void turnon_rack(long id)
 	ACTIVE_RACK_SET[id] = rack;
 	ACTIVE_RACK_NPG_SET[id] = rack;
 
-	if (LOGGING)
-	{
+	if (LOGGING) {
 		char log[BUFSIZ];
 		sprintf(log, "%ld	<turnon_rack>	%ld\n", (long)clock, id);
 		logging(log);
@@ -67,8 +62,7 @@ void turnoff_rack(long id)
 {
 	rack_t *rack = &RACKS[id];
 
-	if (rack->state == STATE_STANDBY)
-	{
+	if (rack->state == STATE_STANDBY) {
 		return;
 	}
 
@@ -79,8 +73,7 @@ void turnoff_rack(long id)
 	STANDBY_RACK_SET[id] = rack;
 	ACTIVE_RACK_NPG_SET.erase(id);
 
-	if (LOGGING)
-	{
+	if (LOGGING) {
 		char log[BUFSIZ];
 		sprintf(log, "%ld	<turnoff_rack>	%ld\n", (long)clock, id);
 		logging(log);
@@ -89,15 +82,13 @@ void turnoff_rack(long id)
 
 void switch_rack(long from, long to)
 {
-	if (from != to)
-	{
+	if (from != to) {
 		FM_RACK_SWTICH[from]->use(uniform(0, SWITCH_DELAY) * MAP_COMPUTATION_TIME);
 		F_MASTER_SWITCH->use(uniform(0, SWITCH_DELAY) * MAP_COMPUTATION_TIME);
 	}
 	FM_RACK_SWTICH[to]->use(uniform(0, SWITCH_DELAY) * MAP_COMPUTATION_TIME);
 
-	if (LOGGING)
-	{
+	if (LOGGING) {
 		char log[BUFSIZ];
 		sprintf(log, "%ld	<switch_rack>	%ld -> %ld\n", (long)clock, from, to);
 		logging(log);
@@ -107,15 +98,13 @@ void switch_rack(long from, long to)
 void switch_rack(long from, long to, long n)
 {	// For budget data transfer
 	double t = SWITCH_SPEED * n;
-	if (from != to)
-	{
+	if (from != to) {
 		FM_RACK_SWTICH[from]->use(t);
 		F_MASTER_SWITCH->use(t);
 	}
 	FM_RACK_SWTICH[to]->use(t);
 
-	if (LOGGING)
-	{
+	if (LOGGING) {
 		char log[BUFSIZ];
 		sprintf(log, "%ld	<switch_rack>	%ld -> %ld (%ld blocks)\n", (long)clock, from, to, n);
 		logging(log);

@@ -24,10 +24,8 @@ msg_t * scheduler(long node)
 	std::list<job_t*> queue;
 	std::list<job_t*>::iterator it, itend;
 
-	for (i = 0; i < MAP_SLOTS; ++i)
-	{
-		if (nptr->mapper.slot[i]->used == false)
-		{
+	for (i = 0; i < MAP_SLOTS; ++i) {
+		if (nptr->mapper.slot[i]->used == false) {
 			slotid = nptr->mapper.slot[i]->id;
 			break;
 		}
@@ -38,8 +36,7 @@ msg_t * scheduler(long node)
 
 	it = queue.begin();
 	itend = queue.end();
-	while (it != itend)
-	{
+	while (it != itend) {
 		job = *it;
 
 		msg = new msg_t;
@@ -47,10 +44,8 @@ msg_t * scheduler(long node)
 		msg->task.job = job;
 		msg->task.locality = LOCAL_LENGTH;
 
-		if (job->map_splits.find(rack) != job->map_splits.end())
-		{
-			if (job->map_splits[rack].find(node) != job->map_splits[rack].end())
-			{
+		if (job->map_splits.find(rack) != job->map_splits.end()) {
+			if (job->map_splits[rack].find(node) != job->map_splits[rack].end()) {
 				// local node
 				msg->task.block = GetBlock(job->map_splits[rack][node].begin()->first);
 				msg->task.locality = LOCAL_NODE;
@@ -64,11 +59,8 @@ msg_t * scheduler(long node)
 			msg->task.block = GetBlock(nit->second.begin()->first);
 			msg->task.locality = LOCAL_RACK;
 			msg->task.local_node = nit->first;
-			job->skipcount = 0;
-			return msg;
 		}
-		else
-		{
+		else {
 			// local remote
 			std::map<long, std::map<long, std::map<long, long>>>::iterator rit = job->map_splits.begin();
 			std::advance(rit, uniform_int(0, job->map_splits.size() - 1));
@@ -79,13 +71,10 @@ msg_t * scheduler(long node)
 			msg->task.local_node = nit->first;
 		}
 
-		if (SETUP_SCHEDULER_TYPE == FAIR_SCHEDULER
-			&& msg->task.locality != LOCAL_LENGTH)
-		{
+		if (SETUP_SCHEDULER_TYPE == FAIR_SCHEDULER && msg->task.locality != LOCAL_LENGTH) {
 			return msg;
 		}
-		else if (SETUP_SCHEDULER_TYPE == DELAY_SCHEDULER)
-		{
+		else if (SETUP_SCHEDULER_TYPE == DELAY_SCHEDULER) {
 			// maximum skip count, D
 			// wish to achieve locality greater than gamma
 			// for jobs with N tasks on a cluster with M nodes
@@ -97,8 +86,10 @@ msg_t * scheduler(long node)
 			long M = ACTIVE_NODE_SET.size();
 			double R = (double)M / CS_NODE_NUM;
 			double D = (double)-(M / R) * log(((1 - gamma) * N) / (1 + (1 - gamma) * N));
-			if (job->skipcount >= (long)ceil(D) && msg->task.locality != LOCAL_LENGTH)
-			{
+			if (job->skipcount >= (long)ceil(D / 2) && msg->task.locality == LOCAL_RACK) {
+				return msg;
+			}
+			if (job->skipcount >= (long)ceil(D) && msg->task.locality != LOCAL_LENGTH) {
 				return msg;
 			}
 			++job->skipcount;

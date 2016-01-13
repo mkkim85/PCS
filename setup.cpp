@@ -10,7 +10,9 @@ long SETUP_TIME_WINDOW;
 long SETUP_FILE_SIZE;
 long SETUP_RANDOM_SEED;
 long SETUP_SCHEDULER_TYPE;
-FILE *SETUP_REPORT_PATH, *SETUP_SIM_OUTPUT;
+double SETUP_LOAD_SCENARIO[5];
+char SETUP_REPORT_PATH[BUFSIZ];
+FILE *SETUP_REPORT_FILE, *SETUP_SIM_OUTPUT;
 
 void setup(void)
 {
@@ -21,6 +23,13 @@ void setup(void)
 		&SETUP_MODE_TYPE, &SETUP_REPORT_PERIOD, &SETUP_TIME_WINDOW, &SETUP_FILE_SIZE, &SETUP_DATA_SKEW,
 		&SETUP_BUDGET_RATIO, &SETUP_ALPHA, &SETUP_BETA, &SETUP_SCHEDULER_TYPE, &SETUP_RANDOM_SEED);
 
+	scanf("%lf%lf%lf%lf%lf",
+		&SETUP_LOAD_SCENARIO[0], 
+		&SETUP_LOAD_SCENARIO[1], 
+		&SETUP_LOAD_SCENARIO[2], 
+		&SETUP_LOAD_SCENARIO[3], 
+		&SETUP_LOAD_SCENARIO[4]);
+
 	SETUP_REPORT_PERIOD *= MINUTE;
 	SETUP_TIME_WINDOW *= MINUTE;
 
@@ -29,8 +38,7 @@ void setup(void)
 		SETUP_BUDGET_RATIO, SETUP_ALPHA, SETUP_BETA, SETUP_SCHEDULER_TYPE, SETUP_RANDOM_SEED);
 
 	struct stat *stat_buf = new struct stat;
-	if ((stat("_report", stat_buf)) == -1)
-	{
+	if ((stat("_report", stat_buf)) == -1) {
 		system("mkdir _report");
 	}
 	delete stat_buf;
@@ -38,5 +46,6 @@ void setup(void)
 	sprintf(str, "_report\\%s.txt", path);
 	SETUP_SIM_OUTPUT = fopen(str, "w");
 	sprintf(str, "_report\\%s.csv", path);
-	SETUP_REPORT_PATH = fopen(str, "w");
+	strcpy(SETUP_REPORT_PATH, str);
+	SETUP_REPORT_FILE = fopen(str, "w");
 }

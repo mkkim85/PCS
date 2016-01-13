@@ -27,8 +27,7 @@ void init_node(void)
 	rack_t *prack;
 	slot_t *pslot;
 
-	for (i = 0; i < NODE_NUM; ++i)
-	{
+	for (i = 0; i < NODE_NUM; ++i) {
 		pnode = &NODES[i];
 		pnode->id = i;
 		pnode->mapper.capacity = MAP_SLOTS;
@@ -47,8 +46,7 @@ void init_node(void)
 		M_NODE[i] = new mailbox(str);
 		node(i);
 
-		for (j = 0; j < MAP_SLOTS; ++j)
-		{
+		for (j = 0; j < MAP_SLOTS; ++j) {
 			pslot = &MAPPER[MAX_MAPPER_ID];
 			pslot->id = MAX_MAPPER_ID;
 			pslot->used = false;
@@ -101,53 +99,42 @@ void node(long id)
 	
 	sprintf(str, "node%ld", id);
 	create(str);
-	while (true)
-	{
+	while (true) {
 		M_NODE[id]->receive((long*)&r);
 
-		if (r->power.power == true && my->state == STATE_STANDBY)
-		{
+		if (r->power.power == true && my->state == STATE_STANDBY) {
 			// Copy replications in budget
-			if (SETUP_MODE_TYPE == MODE_PCS
-				&& MANAGER_BUDGET_MAP.find(id) != MANAGER_BUDGET_MAP.end())
-			{
+			if (SETUP_MODE_TYPE == MODE_PCS && MANAGER_BUDGET_MAP.find(id) != MANAGER_BUDGET_MAP.end()) {
 				std::map<long, std::list<long>>::iterator it = MANAGER_BUDGET_MAP[id].begin(),
 					itend = MANAGER_BUDGET_MAP[id].end();
 
-				while (it != itend)
-				{
+				while (it != itend) {
 					switch_rack(it->first, parent->id, it->second.size());
 					// insert blocks in budget
-					while (!it->second.empty())
-					{
+					while (!it->second.empty()) {
 						block_t *b = GetBlock(it->second.front());
 						it->second.pop_front();
 						my->space.budget.blocks[b->id] = b;
 						++my->space.budget.used;
 						++my->space.used;
-						if (parent->blocks.find(b->id) == parent->blocks.end())
-						{
+						if (parent->blocks.find(b->id) == parent->blocks.end()) {
 							parent->blocks[b->id] = 1;
 						}
-						else
-						{
+						else {
 							++parent->blocks[b->id];
 						}
 						b->local_node[id] = my;
-						if (b->local_rack.find(rack) == b->local_rack.end())
-						{
+						if (b->local_rack.find(rack) == b->local_rack.end()) {
 							b->local_rack[rack] = 1;
 						}
-						else
-						{
+						else {
 							++b->local_rack[rack];
 						}
 					}
 					++it;
 				}
 			}
-			if (parent->state == STATE_STANDBY)
-			{
+			if (parent->state == STATE_STANDBY) {
 				turnon_rack(rack);
 			}
 			--REPORT_NODE_STATE_COUNT[my->state];
@@ -166,29 +153,23 @@ void node(long id)
 
 			HEARTBEAT[id] = my;
 		}
-		else if (r->power.power == false && my->state == STATE_ACTIVE)
-		{
+		else if (r->power.power == false && my->state == STATE_ACTIVE) {
 			HEARTBEAT.erase(id);
-			while (my->mapper.used > 0)		// wait until all work is completed
-			{
+			while (my->mapper.used > 0) { // wait until all work is completed 
 				hold(1.0);
 			}
 
 			MEMORY[id].clear();
-			if (SETUP_MODE_TYPE == MODE_PCS && !my->space.budget.blocks.empty())
-			{	// clear budget
+			if (SETUP_MODE_TYPE == MODE_PCS && !my->space.budget.blocks.empty()) {	// clear budget
 				std::map<long, void*>::iterator it = my->space.budget.blocks.begin(),
 					itend = my->space.budget.blocks.end();
-				while (it != itend)
-				{
+				while (it != itend) {
 					block_t *b = (block_t*)it->second;
 					b->local_node.erase(id);
-					if (--b->local_rack[rack] == 0)
-					{
+					if (--b->local_rack[rack] == 0) {
 						b->local_rack.erase(rack);
 					}
-					if (--parent->blocks[b->id] == 0)
-					{
+					if (--parent->blocks[b->id] == 0) {
 						parent->blocks.erase(b->id);
 					}
 					++it;
@@ -212,8 +193,7 @@ void node(long id)
 			parent->standby_node_set[id] = my;
 			STANDBY_NODE_SET[id] = my;
 
-			if (parent->state == STATE_ACTIVE && parent->active_node_set.size() == 0)
-			{
+			if (parent->state == STATE_ACTIVE && parent->active_node_set.size() == 0) {
 				turnoff_rack(rack);
 			}
 		}
@@ -226,10 +206,8 @@ bool cache_hit(long nid, long bid)
 {
 	std::list<long> *mem = &MEMORY[nid];
 
-	if (find(mem->begin(), mem->end(), bid) == mem->end())
-	{
-		if (LOGGING)
-		{
+	if (find(mem->begin(), mem->end(), bid) == mem->end()) {
+		if (LOGGING) {
 			char log[BUFSIZ];
 			sprintf(log, "%ld	<cache_hit>	node: %ld, b: %ld hit failed\n", (long)clock, nid, bid);
 			logging(log);
@@ -238,8 +216,7 @@ bool cache_hit(long nid, long bid)
 		return false;
 	}
 
-	if (LOGGING)
-	{
+	if (LOGGING) {
 		char log[BUFSIZ];
 		sprintf(log, "%ld	<cache_hit>	node: %ld, b: %ld hit success\n", (long)clock, nid, bid);
 		logging(log);
@@ -253,24 +230,19 @@ void mem_caching(long nid, long bid)
 	std::list<long> *mem = &MEMORY[nid];
 	std::list<long>::iterator iter;
 
-	if (mem->size() >= MEMORY_SIZE)
-	{
+	if (mem->size() >= MEMORY_SIZE) {
 		iter = find(mem->begin(), mem->end(), bid);
 
-		if (iter != mem->end())
-		{
+		if (iter != mem->end()) {
 			mem->remove(bid);
-			if (LOGGING)
-			{
+			if (LOGGING) {
 				char log[BUFSIZ];
 				sprintf(log, "%ld	<mem_caching>	node: %ld, b: %ld replaced\n", (long)clock, nid, bid);
 				logging(log);
 			}
 		}
-		else
-		{
-			if (LOGGING)
-			{
+		else {
+			if (LOGGING) {
 				char log[BUFSIZ];
 				sprintf(log, "%ld	<mem_caching>	node: %ld, b: %ld removed\n", (long)clock, nid, mem->back());
 				logging(log);
@@ -280,8 +252,7 @@ void mem_caching(long nid, long bid)
 	}
 	MEMORY[nid].push_front(bid);
 
-	if (LOGGING)
-	{
+	if (LOGGING) {
 		char log[BUFSIZ];
 		sprintf(log, "%ld	<mem_caching>	node: %ld, b: %ld cached\n", (long)clock, nid, bid);
 		logging(log);
@@ -293,8 +264,7 @@ void node_cpu(long id, double t)
 	double btime = clock;
 	FM_CPU[id]->use(t);
 
-	if (LOGGING)
-	{
+	if (LOGGING) {
 		char log[BUFSIZ];
 		sprintf(log, "%ld	<node_cpu>	node: %ld, %lf sec\n", (long)clock, id, (double)clock - btime);
 		logging(log);
@@ -307,8 +277,7 @@ void node_mem(long id, long n)
 	double t = MEMORY_SPEED * n;
 	F_MEMORY[id]->use(t);
 
-	if (LOGGING)
-	{
+	if (LOGGING) {
 		char log[BUFSIZ];
 		sprintf(log, "%ld	<node_mem>	node: %ld, %ld blk: %lf sec\n", (long)clock, id, n, (double)clock - btime);
 		logging(log);
@@ -321,8 +290,7 @@ void node_disk(long id, long n)
 	double t = DISK_SPEED * n;
 	FM_DISK[id]->use(t);
 
-	if (LOGGING)
-	{
+	if (LOGGING) {
 		char log[BUFSIZ];
 		sprintf(log, "%ld	<node_disk>	node: %ld, %ld blk: %lf sec\n", (long)clock, id, n, (double)clock - btime);
 		logging(log);

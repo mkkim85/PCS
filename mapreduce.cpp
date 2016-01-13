@@ -18,6 +18,7 @@ extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
 extern double REPORT_RESP_T_TOTAL, REPORT_Q_DELAY_T_TOTAL;
 extern long REPORT_RESP_T_COUNT, REPORT_Q_DELAY_T_COUNT;
 extern long REPORT_LOCALITY[LOCAL_LENGTH];
+extern std::pair<double, long> REPORT_TASK_T, REPORT_CPU_T, REPORT_MEM_T, REPORT_DISK_T, REPORT_NETWORK_T, REPORT_TASK_Q_T;
 
 void job_tracker(void)
 {
@@ -26,29 +27,27 @@ void job_tracker(void)
 	node_t *node;
 
 	create("job_tracker");
-	while (!CSIM_END)
-	{
-		node_map_t heartbeat, reuse;
+	while (!CSIM_END) {
+	//	node_map_t heartbeat, reuse;
+		node_map_t heartbeat;
 
-		if (MAP_QUEUE.empty() == false && HEARTBEAT.empty() == false)
-		{
+		if (MAP_QUEUE.empty() == false && HEARTBEAT.empty() == false) {
 			heartbeat = HEARTBEAT;
-			for (node_map_t::iterator it = heartbeat.begin(); it != heartbeat.end(); NULL)
-			{
+			for (node_map_t::iterator it = heartbeat.begin(); it != heartbeat.end(); NULL) {
 				if (it->second->mapper.used == it->second->mapper.capacity)
 					heartbeat.erase(it++);
 				else ++it;
 			}
 		}
 
-		while ((heartbeat.empty() == false || reuse.empty() == false)
-			&& MAP_QUEUE.empty() == false)
-		{
-			if (heartbeat.empty() == true && reuse.empty() == false)
-			{	// reusing skipped heartbeats
-				heartbeat = reuse;
-				reuse.clear();
-			}
+		/*while ((heartbeat.empty() == false || reuse.empty() == false)
+			&& MAP_QUEUE.empty() == false)*/
+		while (heartbeat.empty() == false && MAP_QUEUE.empty() == false) {
+			//if (heartbeat.empty() == true && reuse.empty() == false)
+			//{	// reusing skipped heartbeats
+			//	heartbeat = reuse;
+			//	reuse.clear();
+			//}
 
 			i = uniform_int(0, heartbeat.size() - 1);
 			node_map_t::iterator it = heartbeat.begin();
@@ -56,9 +55,8 @@ void job_tracker(void)
 			node = it->second;
 			heartbeat.erase(node->id);
 
-			if ((msg = scheduler(node->id)) == NULL)
-			{
-				reuse[node->id] = node;
+			if ((msg = scheduler(node->id)) == NULL) {
+//				reuse[node->id] = node;
 				continue;
 			}
 
@@ -84,10 +82,10 @@ void mapper(long id)
 
 	sprintf(str, "mapper%ld", id);
 	create(str);
-	while (true)
-	{
+	while (true) {
 		M_MAPPER[id]->receive((long*)&r);
 
+		double task_t = clock;
 		job = r->task.job;
 		locality = r->task.locality;
 		++job->running;
@@ -97,34 +95,30 @@ void mapper(long id)
 		job->time.qin = clock;
 		job->time.qtotal += qdelay;
 		T_TASK_TIMES[O_QDELAY]->record(qdelay);
+		REPORT_TASK_Q_T.first += qdelay;
+		REPORT_TASK_Q_T.second++;
 
 		block = r->task.block;
 
 		// erase job split using cascade
 		for (long_map_t::iterator it = job->map_cascade[block->id].begin();
-			it != job->map_cascade[block->id].end();
-			++it)
-		{
+			it != job->map_cascade[block->id].end(); ++it) {
 			long tn = it->first;
 			long tr = it->second;
 
 			job->map_splits[tr][tn][block->id] = job->map_splits[tr][tn][block->id] - 1;
-			if (job->map_splits[tr][tn][block->id] <= 0)
-			{
+			if (job->map_splits[tr][tn][block->id] <= 0) {
 				job->map_splits[tr][tn].erase(block->id);
-				if (job->map_splits[tr][tn].empty() == true)
-				{
+				if (job->map_splits[tr][tn].empty() == true) {
 					job->map_splits[tr].erase(tn);
-					if (job->map_splits[tr].empty() == true)
-					{
+					if (job->map_splits[tr].empty() == true) {
 						job->map_splits.erase(tr);
 					}
 				}
 			}
 		}
 		
-		if (job->map_splits.empty() == true)
-		{
+		if (job->map_splits.empty() == true) {
 			MAP_QUEUE.remove(job);
 		}
 		file = FILE_MAP[block->file_id];
@@ -132,56 +126,56 @@ void mapper(long id)
 		++parent->mapper.used;
 		MAPPER[id].used = true;
 
-		if (locality == LOCAL_NODE)
-		{
-			if (cache_hit(node, block->id))
-			{
+		if (locality == LOCAL_NODE) {
+			if (cache_hit(node, block->id)) {
 				double mem = clock;
 				node_mem(node, 1);
 				T_TASK_TIMES[O_MEMORY]->record(abs(clock - mem));
+				REPORT_MEM_T.first += abs(clock - mem);
+				REPORT_MEM_T.second++;
 			}
-			else
-			{
+			else {
 				double disk = clock;
 				node_disk(node, 1);
 				T_TASK_TIMES[O_DISK]->record(abs(clock - disk));
+				REPORT_DISK_T.first += abs(clock - disk);
+				REPORT_DISK_T.second++;
 			}
 		}
-		else
-		{
+		else {
 			double network = clock;
 			local_node = r->task.local_node;
 			local_rack = GET_RACK_FROM_NODE(local_node);
 			
-			if (cache_hit(local_node, block->id))
-			{
+			if (cache_hit(local_node, block->id)) {
 				node_mem(local_node, 1);
 			}
-			else
-			{
+			else {
 				node_disk(local_node, 1);				
 			}
 			mem_caching(local_node, block->id);
 			switch_rack(local_rack, rack);
 
 			T_TASK_TIMES[O_NETWORK]->record(abs(clock - network));
+			REPORT_NETWORK_T.first += abs(clock - network);
+			REPORT_NETWORK_T.second++;
 		}
 
 		double cpu = clock;
 		node_cpu(node, MAP_COMPUTATION_TIME);
 		T_TASK_TIMES[O_CPU]->record(abs(clock - cpu));
+		REPORT_CPU_T.first += abs(clock - cpu);
+		REPORT_CPU_T.second++;	
 
 		mem_caching(node, block->id);
 
-		if (--file->acc[job->id] <= 0)
-		{
+		if (--file->acc[job->id] <= 0) {
 			file->acc.erase(job->id);
 		}
 		MAPPER[id].used = false;
 		--parent->mapper.used;
 
-		if (--job->running == 0 && job->map_splits.empty() == true)
-		{
+		if (--job->running == 0 && job->map_splits.empty() == true) {
 			// complete job
 			job->time.end = clock;
 			double turnaround_t = abs(job->time.end - job->time.begin);
@@ -193,9 +187,13 @@ void mapper(long id)
 			++REPORT_Q_DELAY_T_COUNT;
 		}
 
-		++REPORT_LOCALITY[locality];
-		T_LOCALITY[locality]->record(1.0);
+		if (node >= CS_NODE_NUM) {
+			++REPORT_LOCALITY[locality];
+			T_LOCALITY[locality]->record(1.0);
+		}
 		--REMAIN_MAP_TASKS;
+		REPORT_TASK_T.first += abs(clock - task_t);
+		REPORT_TASK_T.second++;
 
 		delete r;
 	}
