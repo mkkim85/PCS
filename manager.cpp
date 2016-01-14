@@ -65,8 +65,13 @@ void state_manager(void)
 		REPORT_CAP.first += ACTIVE_NODE_SET.size() * MAP_SLOTS;
 		REPORT_CAP.second++;
 
-		if (SETUP_MODE_TYPE == MODE_SIERRA && clock > 0 && ((long)clock % (long)SIERRA_MONITOR_PERIOD) == 0) {
-			m = (double)m_total / (double)SETUP_TIME_WINDOW;
+		if (SETUP_MODE_TYPE == MODE_SIERRA && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0) {
+			m = 0;
+			for (std::list<long>::iterator it = INCOMPLETE_MAP_TASKS_Q.begin();
+			it != INCOMPLETE_MAP_TASKS_Q.end(); ++it) {
+				if (m < *it)
+					m = *it;
+			}
 			mcap = ACTIVE_NODE_SET.size() * MAP_SLOTS;
 
 			stable = false;
@@ -78,7 +83,7 @@ void state_manager(void)
 			ActivateNodes(MANAGER_CS, bag);
 		}
 
-		if (SETUP_MODE_TYPE == MODE_IPACS && clock > 0 && ((long)clock % (long)IPACS_MONITOR_PERIOD) == 0) {
+		if (SETUP_MODE_TYPE == MODE_IPACS && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0) {
 			m = (double)m_total / (double)SETUP_TIME_WINDOW;
 			mcap = ACTIVE_NODE_SET.size() * MAP_SLOTS;
 

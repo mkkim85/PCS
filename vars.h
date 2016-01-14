@@ -8,8 +8,6 @@
 #define MINUTE					60
 #define HOUR					(60 * MINUTE)
 #define MODE_TRANS_INTERVAL		(3 * MINUTE)
-#define SIERRA_MONITOR_PERIOD	(1.0 * HOUR)
-#define IPACS_MONITOR_PERIOD	(0.5 * HOUR)
 
 // node
 #define NODE_NUM 				1200
