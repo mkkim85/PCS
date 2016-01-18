@@ -3,10 +3,9 @@
 bool MANAGER_CS[NODE_NUM] = { false, };
 bool MANAGER_CS_RACKS[RACK_NUM] = { false, };
 bool stable = true;
-long MANAGER_NODE_NUM;
 long MANAGER_BAG_SIZE, MANAGER_BUDGET_SIZE;
 node_map_t MANAGER_CS_NODES;
-std::list<long> INCOMPLETE_MAP_TASKS_Q;
+std::list<long> INCOMPLETE_MAP_TASKS_Q, PEAK_MAP_TASKS_Q;
 std::list<long_map_t> FILE_ACC_H;
 std::list<rack_t*> MANAGER_RANK;
 std::map<long, std::map<long, std::list<long>>> MANAGER_BUDGET_MAP;
@@ -25,11 +24,12 @@ extern rack_map_t ACTIVE_RACK_NPG_SET, NPG_SET;
 extern mailbox *M_NODE[NODE_NUM];
 extern std::pair<double, long> REPORT_AVG_M;
 extern std::pair<long, long> REPORT_CAP, REPORT_REQ_M;
+extern long CURRENT_MAP_TASKS;
 
 void state_manager(void)
 {
 	double m, mcap;
-	long stable_t = clock;
+	long btrans_t = clock;
 	long req_m, top_k = 0, size;
 	long m_total = 0;
 	long_map_t *bag = NULL;
@@ -39,10 +39,8 @@ void state_manager(void)
 
 	create("state manager");
 	while (!CSIM_END) {
-		if (stable == false && MANAGER_NODE_NUM == ACTIVE_NODE_SET.size()) {
+		if (stable == false && (long)clock - btrans_t >= MODE_TRANS_INTERVAL)
 			stable = true;
-			stable_t = clock;
-		}
 
 		size = FILE_ACC_H.size();
 		if (size >= SETUP_TIME_WINDOW) {
@@ -58,7 +56,17 @@ void state_manager(void)
 		}
 		m_total += REMAIN_MAP_TASKS;
 		INCOMPLETE_MAP_TASKS_Q.push_back(REMAIN_MAP_TASKS);
-		
+
+		if (SETUP_MODE_TYPE == MODE_SIERRA) {
+			if ((long)clock % (long)(MAP_COMPUTATION_TIME * 2) == 0) {
+				if (PEAK_MAP_TASKS_Q.size() >= (SETUP_TIME_WINDOW / (MAP_COMPUTATION_TIME * 2))) {
+					PEAK_MAP_TASKS_Q.pop_front();
+				}
+				PEAK_MAP_TASKS_Q.push_back(CURRENT_MAP_TASKS);
+				CURRENT_MAP_TASKS = 0;
+			}
+		}
+
 		REPORT_AVG_M.first += (double)m_total / (double)INCOMPLETE_MAP_TASKS_Q.size();
 		REPORT_AVG_M.second++;
 		
@@ -67,13 +75,12 @@ void state_manager(void)
 
 		if (SETUP_MODE_TYPE == MODE_SIERRA && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0) {
 			m = 0;
-			for (std::list<long>::iterator it = INCOMPLETE_MAP_TASKS_Q.begin();
-			it != INCOMPLETE_MAP_TASKS_Q.end(); ++it) {
+			for (std::list<long>::iterator it = PEAK_MAP_TASKS_Q.begin();
+			it != PEAK_MAP_TASKS_Q.end(); ++it) {
 				if (m < *it)
 					m = *it;
 			}
-			mcap = ACTIVE_NODE_SET.size() * MAP_SLOTS;
-
+			btrans_t = clock;
 			stable = false;
 			req_m = m - (CS_NODE_NUM * MAP_SLOTS);
 			REPORT_REQ_M.first += req_m;
@@ -85,8 +92,8 @@ void state_manager(void)
 
 		if (SETUP_MODE_TYPE == MODE_IPACS && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0) {
 			m = (double)m_total / (double)SETUP_TIME_WINDOW;
-			mcap = ACTIVE_NODE_SET.size() * MAP_SLOTS;
 
+			btrans_t = clock;
 			stable = false;
 			req_m = m - (CS_NODE_NUM * MAP_SLOTS);
 			REPORT_REQ_M.first += req_m;
@@ -98,13 +105,13 @@ void state_manager(void)
 			ActivateNodes(MANAGER_CS, bag);
 		}
 
-		if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_RCS) && stable == true && size >= SETUP_TIME_WINDOW
-			&& (long)clock - stable_t >= (long)MODE_TRANS_INTERVAL) {
+		if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_RCS) && stable == true && size >= SETUP_TIME_WINDOW) {
 			m = (double)m_total / (double)SETUP_TIME_WINDOW;
 			mcap = ACTIVE_NODE_SET.size() * MAP_SLOTS;
 
 			if ((m / mcap >= 1 + SETUP_ALPHA && STANDBY_NODE_SET.size() > 0)
 				|| (m / mcap < 1 - SETUP_BETA && ACTIVE_NODE_SET.size() > CS_NODE_NUM)) {
+				btrans_t = clock;
 				stable = false;
 				req_m = m - (CS_NODE_NUM * MAP_SLOTS);
 				REPORT_REQ_M.first += req_m;
@@ -338,7 +345,6 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 void ActivateNodes(bool cs[], long_map_t *bag)
 {
 	long i;
-	MANAGER_NODE_NUM = CS_NODE_NUM;
 	msg_t *msg;
 
 	if (SETUP_MODE_TYPE == MODE_PCS && bag != NULL) { // TODO: using bag
@@ -489,8 +495,6 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 				msg->power.power = true;
 				M_NODE[i]->send((long)msg);
 			}
-
-			++MANAGER_NODE_NUM;
 		}
 		else {	// turn off nodes
 			if (NODES[i].state == STATE_ACTIVE) {

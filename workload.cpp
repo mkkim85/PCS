@@ -2,6 +2,7 @@
 
 long REMAIN_MAP_TASKS;
 long MAX_JOB_ID;
+long CURRENT_MAP_TASKS;
 double CHANGE_T, CUR_INT, NEXT_INT;
 std::map<long, job_t*> JOB_MAP;
 std::list<job_t*> MAP_QUEUE;
@@ -88,6 +89,7 @@ void workload(void)
 
 		REMAIN_MAP_TASKS += JOB_MAP_TASK_NUM;
 		REPORT_MAP_TASKS += JOB_MAP_TASK_NUM;
+		CURRENT_MAP_TASKS += JOB_MAP_TASK_NUM;
 		JOB_MAP[job->id] = job;
 		MAP_QUEUE.push_back(job);
 

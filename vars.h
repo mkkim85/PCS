@@ -7,7 +7,7 @@
 #define TIME_UNIT				1.0
 #define MINUTE					60
 #define HOUR					(60 * MINUTE)
-#define MODE_TRANS_INTERVAL		(3 * MINUTE)
+#define MODE_TRANS_INTERVAL		(5 * MINUTE)
 
 // node
 #define NODE_NUM 				1200
