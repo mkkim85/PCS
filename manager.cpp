@@ -3,6 +3,7 @@
 bool MANAGER_CS[NODE_NUM] = { false, };
 bool MANAGER_CS_RACKS[RACK_NUM] = { false, };
 bool stable = true;
+long PREV_REQ_M;
 long MANAGER_BAG_SIZE, MANAGER_BUDGET_SIZE;
 node_map_t MANAGER_CS_NODES;
 std::list<long> INCOMPLETE_MAP_TASKS_Q, PEAK_MAP_TASKS_Q;
@@ -10,6 +11,7 @@ std::list<long_map_t> FILE_ACC_H;
 std::list<rack_t*> MANAGER_RANK;
 std::map<long, std::map<long, std::list<long>>> MANAGER_BUDGET_MAP;
 
+extern bool GROWING_PHASE;
 extern node_t NODES[NODE_NUM];
 extern rack_t RACKS[RACK_NUM];
 extern long REMAIN_MAP_TASKS;
@@ -50,14 +52,22 @@ void state_manager(void)
 		FILE_ACC_H.push_back(GetUnitOfFileAcc());
 		++size;
 
-		if (INCOMPLETE_MAP_TASKS_Q.size() >= SETUP_TIME_WINDOW) {
-			m_total -= INCOMPLETE_MAP_TASKS_Q.front();
-			INCOMPLETE_MAP_TASKS_Q.pop_front();
+		if (SETUP_MODE_TYPE == MODE_SIERRA) {
+			if (INCOMPLETE_MAP_TASKS_Q.size() >= (1.0 * HOUR)) {
+				m_total -= INCOMPLETE_MAP_TASKS_Q.front();
+				INCOMPLETE_MAP_TASKS_Q.pop_front();
+			}
+		}
+		else {
+			if (INCOMPLETE_MAP_TASKS_Q.size() >= SETUP_TIME_WINDOW) {
+				m_total -= INCOMPLETE_MAP_TASKS_Q.front();
+				INCOMPLETE_MAP_TASKS_Q.pop_front();
+			}
 		}
 		m_total += REMAIN_MAP_TASKS;
 		INCOMPLETE_MAP_TASKS_Q.push_back(REMAIN_MAP_TASKS);
 
-		if (SETUP_MODE_TYPE == MODE_SIERRA) {
+		/*if (SETUP_MODE_TYPE == MODE_SIERRA) {
 			if ((long)clock % (long)(MAP_COMPUTATION_TIME * 2) == 0) {
 				if (PEAK_MAP_TASKS_Q.size() >= (SETUP_TIME_WINDOW / (MAP_COMPUTATION_TIME * 2))) {
 					PEAK_MAP_TASKS_Q.pop_front();
@@ -65,7 +75,7 @@ void state_manager(void)
 				PEAK_MAP_TASKS_Q.push_back(CURRENT_MAP_TASKS);
 				CURRENT_MAP_TASKS = 0;
 			}
-		}
+		}*/
 
 		REPORT_AVG_M.first += (double)m_total / (double)INCOMPLETE_MAP_TASKS_Q.size();
 		REPORT_AVG_M.second++;
@@ -75,19 +85,29 @@ void state_manager(void)
 
 		if (SETUP_MODE_TYPE == MODE_SIERRA && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0) {
 			m = 0;
-			for (std::list<long>::iterator it = PEAK_MAP_TASKS_Q.begin();
+			/*for (std::list<long>::iterator it = PEAK_MAP_TASKS_Q.begin();
 			it != PEAK_MAP_TASKS_Q.end(); ++it) {
 				if (m < *it)
 					m = *it;
+			}*/
+			for (std::list<long>::iterator it = INCOMPLETE_MAP_TASKS_Q.begin();
+			it != INCOMPLETE_MAP_TASKS_Q.end(); ++it) {
+			if (m < *it)
+			m = *it;
 			}
+
 			btrans_t = clock;
 			stable = false;
 			req_m = m - (CS_NODE_NUM * MAP_SLOTS);
 			REPORT_REQ_M.first += req_m;
 			REPORT_REQ_M.second++;
 
-			bag = FindSierra(MANAGER_CS, top_k, req_m);
-			ActivateNodes(MANAGER_CS, bag);
+			if ((GROWING_PHASE == true && req_m > PREV_REQ_M)
+				|| GROWING_PHASE == false) {
+				bag = FindSierra(MANAGER_CS, top_k, req_m);
+				ActivateNodes(MANAGER_CS, bag);
+				PREV_REQ_M = req_m;
+			}
 		}
 
 		if (SETUP_MODE_TYPE == MODE_IPACS && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0) {

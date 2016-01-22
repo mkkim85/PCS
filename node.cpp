@@ -143,7 +143,7 @@ void node(long id)
 			parent->standby_node_set.erase(id);
 			STANDBY_NODE_SET.erase(id);
 
-			hold(NODE_U_TIME);
+			hold(NODE_U_TIME * NODE_T_FATOR);
 
 			--REPORT_NODE_STATE_COUNT[my->state];
 			my->state = STATE_ACTIVE;
@@ -185,7 +185,7 @@ void node(long id)
 			parent->active_node_set.erase(id);
 			ACTIVE_NODE_SET.erase(id);
 
-			hold(NODE_D_TIME);
+			hold(NODE_D_TIME * NODE_T_FATOR);
 
 			--REPORT_NODE_STATE_COUNT[my->state];
 			my->state = STATE_STANDBY;

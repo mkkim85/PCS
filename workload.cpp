@@ -1,5 +1,6 @@
 #include "header.h"
 
+bool GROWING_PHASE;
 long REMAIN_MAP_TASKS;
 long MAX_JOB_ID;
 long CURRENT_MAP_TASKS;
@@ -16,6 +17,7 @@ extern long REPORT_MAP_TASKS;
 void scenario(void)
 {
 	create("scenario");
+	GROWING_PHASE = true;
 	CHANGE_T = 0.5 * HOUR;
 	CUR_INT = SETUP_LOAD_SCENARIO[0];
 	NEXT_INT = SETUP_LOAD_SCENARIO[1];
@@ -26,16 +28,21 @@ void scenario(void)
 	NEXT_INT = SETUP_LOAD_SCENARIO[2];
 	hold(3.0 * HOUR);
 
+	GROWING_PHASE = false;
+	hold(1.5 * HOUR);
+	
+	GROWING_PHASE = true;
 	CHANGE_T = 6.0 * HOUR;
 	CUR_INT = SETUP_LOAD_SCENARIO[2];
 	NEXT_INT = SETUP_LOAD_SCENARIO[3];
-	hold(2.5 * HOUR);
+	hold(1.0 * HOUR);
 
 	CHANGE_T = 10.0 * HOUR;
 	CUR_INT = SETUP_LOAD_SCENARIO[3];
 	NEXT_INT = SETUP_LOAD_SCENARIO[4];
 	hold(3.0 * HOUR);
 
+	GROWING_PHASE = false;
 	hold(1.5 * HOUR);
 
 	CSIM_END = true;
