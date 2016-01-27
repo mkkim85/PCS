@@ -1,4 +1,7 @@
 // simulation parameters
+#define FB_WORKLOAD				true
+#define FB_PATH					"files/workload.txt"
+#define FB_LOAD_RATIO			0.5
 #define LOGGING					false
 #define REPLICATION_FACTOR		3
 #define MAP_COMPUTATION_TIME	300.0
@@ -19,8 +22,7 @@
 #define NODE_T_FATOR			1.0
 #define NODE_U_TIME				(100.0 * NODE_T_FATOR)		// ACTIVATING TIME (sec)
 #define NODE_D_TIME				(11.0 * NODE_T_FATOR)		// DEACTIVATING TIME (sec)
-#define CAP_FACTOR				1.0
-#define MAP_SLOTS				(long)(8 * CAP_FACTOR)	// HP(Xeon)
+#define MAP_SLOTS				8			// HP(Xeon)
 #define MAP_SLOTS_MAX			(NODE_NUM * MAP_SLOTS)
 #define CPU_CORE				(MAP_SLOTS)
 #define MEMORY_SIZE				128			// 8 GB, 128 blocks
