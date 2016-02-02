@@ -67,16 +67,6 @@ void state_manager(void)
 		m_total += REMAIN_MAP_TASKS;
 		INCOMPLETE_MAP_TASKS_Q.push_back(REMAIN_MAP_TASKS);
 
-		/*if (SETUP_MODE_TYPE == MODE_SIERRA) {
-			if ((long)clock % (long)(MAP_COMPUTATION_TIME * 2) == 0) {
-				if (PEAK_MAP_TASKS_Q.size() >= (SETUP_TIME_WINDOW / (MAP_COMPUTATION_TIME * 2))) {
-					PEAK_MAP_TASKS_Q.pop_front();
-				}
-				PEAK_MAP_TASKS_Q.push_back(CURRENT_MAP_TASKS);
-				CURRENT_MAP_TASKS = 0;
-			}
-		}*/
-
 		REPORT_AVG_M.first += (double)m_total / (double)INCOMPLETE_MAP_TASKS_Q.size();
 		REPORT_AVG_M.second++;
 		
@@ -85,15 +75,10 @@ void state_manager(void)
 
 		if (SETUP_MODE_TYPE == MODE_SIERRA && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0) {
 			m = 0;
-			/*for (std::list<long>::iterator it = PEAK_MAP_TASKS_Q.begin();
-			it != PEAK_MAP_TASKS_Q.end(); ++it) {
-				if (m < *it)
-					m = *it;
-			}*/
 			for (std::list<long>::iterator it = INCOMPLETE_MAP_TASKS_Q.begin();
 			it != INCOMPLETE_MAP_TASKS_Q.end(); ++it) {
-			if (m < *it)
-			m = *it;
+				if (m < *it)
+					m = *it;
 			}
 
 			btrans_t = clock;
@@ -126,7 +111,8 @@ void state_manager(void)
 		}
 
 		if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_RCS) && stable == true && size >= SETUP_TIME_WINDOW) {
-			m = (double)m_total / (double)SETUP_TIME_WINDOW;
+			//m = (double)m_total / (double)SETUP_TIME_WINDOW;
+			m = REMAIN_MAP_TASKS;
 			mcap = ACTIVE_NODE_SET.size() * MAP_SLOTS;
 
 			if ((m / mcap >= 1 + SETUP_ALPHA && STANDBY_NODE_SET.size() > 0)

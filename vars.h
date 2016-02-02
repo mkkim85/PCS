@@ -1,5 +1,5 @@
 // simulation parameters
-#define FB_WORKLOAD				true
+#define FB_WORKLOAD				false
 #define FB_PATH					"files/workload.txt"
 #define FB_LOAD_RATIO			0.5
 #define LOGGING					false
@@ -19,9 +19,8 @@
 #define NODE_D_POWER			129.0		// DEACTIVATE
 #define NODE_S_POWER			18.0		// STANDBY
 #define NODE_A_POWER			315.0		// ACTIVE
-#define NODE_T_FATOR			1.0
-#define NODE_U_TIME				(100.0 * NODE_T_FATOR)		// ACTIVATING TIME (sec)
-#define NODE_D_TIME				(11.0 * NODE_T_FATOR)		// DEACTIVATING TIME (sec)
+#define NODE_U_TIME				100.0		// ACTIVATING TIME (sec)
+#define NODE_D_TIME				11.0		// DEACTIVATING TIME (sec)
 #define MAP_SLOTS				8			// HP(Xeon)
 #define MAP_SLOTS_MAX			(NODE_NUM * MAP_SLOTS)
 #define CPU_CORE				(MAP_SLOTS)
