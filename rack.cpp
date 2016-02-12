@@ -80,8 +80,9 @@ void turnoff_rack(long id)
 	}
 }
 
-void switch_rack(long from, long to)
+double switch_rack(long from, long to)
 {
+	double begin = clock;
 	if (from != to) {
 		FM_RACK_SWTICH[from]->use(uniform(0, SWITCH_DELAY) * MAP_COMPUTATION_TIME);
 		F_MASTER_SWITCH->use(uniform(0, SWITCH_DELAY) * MAP_COMPUTATION_TIME);
@@ -93,10 +94,13 @@ void switch_rack(long from, long to)
 		sprintf(log, "%ld	<switch_rack>	%ld -> %ld\n", (long)clock, from, to);
 		logging(log);
 	}
+
+	return clock - begin;
 }
 
-void switch_rack(long from, long to, long n)
+double  switch_rack(long from, long to, long n)
 {	// For budget data transfer
+	double begin = clock;
 	double t = SWITCH_SPEED * n;
 	if (from != to) {
 		FM_RACK_SWTICH[from]->use(t);
@@ -109,4 +113,6 @@ void switch_rack(long from, long to, long n)
 		sprintf(log, "%ld	<switch_rack>	%ld -> %ld (%ld blocks)\n", (long)clock, from, to, n);
 		logging(log);
 	}
+
+	return clock - begin;
 }

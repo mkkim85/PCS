@@ -3,7 +3,7 @@
 
 // file.cpp
 void gen_file(void);
-long_map_t GetUnitOfFileAcc(void);
+//long_map_t GetUnitOfFileAcc(void);
 long_map_t* GetPopularBlockList(long *top_k);
 block_t* GetBlock(long id);
 
@@ -43,8 +43,8 @@ void node_disk(long id, long n);
 void init_rack(void);
 void turnon_rack(long id);
 void turnoff_rack(long id);
-void switch_rack(long from, long to);
-void switch_rack(long from, long to, long n);
+double switch_rack(long from, long to);
+double switch_rack(long from, long to, long n);
 
 // report.cpp
 void sim_report(void);

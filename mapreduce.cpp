@@ -2,6 +2,7 @@
 
 node_map_t HEARTBEAT;
 
+extern std::map<long, std::list<std::pair<double, long>>> FILE_HISTORY;
 extern node_t NODES[NODE_NUM];
 extern slot_t MAPPER[MAP_SLOTS_MAX];
 extern long REMAIN_MAP_TASKS;
@@ -74,6 +75,7 @@ void mapper(long id)
 	long node = GET_NODE_FROM_MAPPER(id), local_node;
 	long rack = GET_RACK_FROM_NODE(node), local_rack;
 	long group = GET_G_FROM_RACK(rack);
+	double btask, task_t, bcpu, cpu_t, bmem, mem_t, bdisk, disk_t, q_t, net_t;
 	node_t *parent = &NODES[node];
 	LocalTypes locality;
 	block_t *block;
@@ -84,25 +86,22 @@ void mapper(long id)
 	create(str);
 	while (true) {
 		M_MAPPER[id]->receive((long*)&r);
+		btask = task_t = bcpu = cpu_t = bmem = mem_t = bdisk = disk_t = q_t = net_t = 0;
 
-		double task_t = clock;
+		btask = clock;
 		job = r->task.job;
 		locality = r->task.locality;
 		++job->running;
 		++job->run_total;
 
-		double qdelay = abs(clock - job->time.qin);
-		job->time.qin = clock;
-		job->time.qtotal += qdelay;
-		T_TASK_TIMES[O_QDELAY]->record(qdelay);
-		REPORT_TASK_Q_T.first += qdelay;
-		REPORT_TASK_Q_T.second++;
+		q_t = abs(clock - job->time.begin);
+		job->time.qtotal += q_t;
 
 		block = r->task.block;
 
 		// erase job split using cascade
 		for (long_map_t::iterator it = job->map_cascade[block->id].begin();
-			it != job->map_cascade[block->id].end(); ++it) {
+		it != job->map_cascade[block->id].end(); ++it) {
 			long tn = it->first;
 			long tr = it->second;
 
@@ -117,57 +116,60 @@ void mapper(long id)
 				}
 			}
 		}
-		
+
 		if (job->map_splits.empty() == true) {
 			MAP_QUEUE.remove(job);
 		}
 		file = FILE_MAP[block->file_id];
+		long psiz = file->acc.size();
 		++file->acc[job->id];
+		long csiz = file->acc.size();
+		if ((SETUP_MODE_TYPE == MODE_IPACS || SETUP_MODE_TYPE == MODE_PCS)
+			&& csiz > 1 && psiz != csiz) {
+			FILE_HISTORY[file->id].push_back(std::pair<double, long>(clock, csiz));
+		}
 		++parent->mapper.used;
 		MAPPER[id].used = true;
 
 		if (locality == LOCAL_NODE) {
 			if (cache_hit(node, block->id)) {
-				double mem = clock;
+				bmem = clock;
 				node_mem(node, 1);
-				T_TASK_TIMES[O_MEMORY]->record(abs(clock - mem));
-				REPORT_MEM_T.first += abs(clock - mem);
-				REPORT_MEM_T.second++;
+				mem_t = abs(clock - bmem);
 			}
 			else {
-				double disk = clock;
+				bdisk = clock;
 				node_disk(node, 1);
-				T_TASK_TIMES[O_DISK]->record(abs(clock - disk));
-				REPORT_DISK_T.first += abs(clock - disk);
-				REPORT_DISK_T.second++;
+				disk_t = clock - bdisk;
 			}
 		}
 		else {
-			double network = clock;
 			local_node = r->task.local_node;
 			local_rack = GET_RACK_FROM_NODE(local_node);
-			
 			if (cache_hit(local_node, block->id)) {
+				bmem = clock;
 				node_mem(local_node, 1);
+				mem_t = abs(clock - bmem);
 			}
 			else {
-				node_disk(local_node, 1);				
+				bdisk = clock;
+				node_disk(local_node, 1);
+				disk_t = clock - bdisk;
 			}
-			mem_caching(local_node, block->id);
-			switch_rack(local_rack, rack);
 
-			T_TASK_TIMES[O_NETWORK]->record(abs(clock - network));
-			REPORT_NETWORK_T.first += abs(clock - network);
-			REPORT_NETWORK_T.second++;
+			mem_caching(local_node, block->id);
+
+			net_t = switch_rack(local_rack, rack);
 		}
 
-		double cpu = clock;
-		node_cpu(node, MAP_COMPUTATION_TIME);
-		T_TASK_TIMES[O_CPU]->record(abs(clock - cpu));
-		REPORT_CPU_T.first += abs(clock - cpu);
-		REPORT_CPU_T.second++;	
-
 		mem_caching(node, block->id);
+
+		bcpu = clock;
+		node_cpu(node, MAP_COMPUTATION_TIME);
+		cpu_t = abs(clock - bcpu);
+		T_TASK_TIMES[O_CPU]->record(cpu_t);
+		REPORT_CPU_T.first += cpu_t;
+		REPORT_CPU_T.second++;	
 
 		if (--file->acc[job->id] <= 0) {
 			file->acc.erase(job->id);
@@ -192,7 +194,25 @@ void mapper(long id)
 			T_LOCALITY[locality]->record(1.0);
 		}
 		--REMAIN_MAP_TASKS;
-		REPORT_TASK_T.first += abs(clock - task_t);
+
+		T_TASK_TIMES[O_MEMORY]->record(mem_t);
+		REPORT_MEM_T.first += mem_t;
+		REPORT_MEM_T.second++;
+
+		T_TASK_TIMES[O_DISK]->record(disk_t);
+		REPORT_DISK_T.first += disk_t;
+		REPORT_DISK_T.second++;
+
+		T_TASK_TIMES[O_QDELAY]->record(q_t);
+		REPORT_TASK_Q_T.first += q_t;
+		REPORT_TASK_Q_T.second++;
+
+		T_TASK_TIMES[O_NETWORK]->record(net_t);
+		REPORT_NETWORK_T.first += net_t;
+		REPORT_NETWORK_T.second++;
+
+		task_t = abs(clock - btask) + q_t;
+		REPORT_TASK_T.first += task_t;
 		REPORT_TASK_T.second++;
 
 		delete r;

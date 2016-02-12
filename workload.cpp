@@ -1,9 +1,8 @@
 #include "header.h"
 
-bool GROWING_PHASE;
+bool GROWING_PHASE, EV_NEW_JOB = false;
 long REMAIN_MAP_TASKS;
 long MAX_JOB_ID;
-long CURRENT_MAP_TASKS;
 double CHANGE_T, CUR_INT, NEXT_INT;
 std::map<long, job_t*> JOB_MAP;
 std::list<job_t*> MAP_QUEUE;
@@ -80,7 +79,6 @@ void workload(void)
 				job->running = 0;
 				job->time.begin = sec;
 				job->time.end = 0;
-				job->time.qin = sec;
 				job->time.qtotal = 0;
 				job->map_total = 0;
 				job->skipcount = 0;	// for delay scheduler
@@ -111,7 +109,7 @@ void workload(void)
 
 				REMAIN_MAP_TASKS += maps;
 				REPORT_MAP_TASKS += maps;
-				CURRENT_MAP_TASKS += maps;
+				EV_NEW_JOB = true;
 				JOB_MAP[job->id] = job;
 				MAP_QUEUE.push_back(job);
 
@@ -141,7 +139,6 @@ void workload(void)
 			job->running = 0;
 			job->time.begin = sec;
 			job->time.end = 0;
-			job->time.qin = sec;
 			job->time.qtotal = 0;
 			job->map_total = 0;
 			job->skipcount = 0;	// for delay scheduler
@@ -172,7 +169,7 @@ void workload(void)
 
 			REMAIN_MAP_TASKS += JOB_MAP_TASK_NUM;
 			REPORT_MAP_TASKS += JOB_MAP_TASK_NUM;
-			CURRENT_MAP_TASKS += JOB_MAP_TASK_NUM;
+			EV_NEW_JOB = true;
 			JOB_MAP[job->id] = job;
 			MAP_QUEUE.push_back(job);
 

@@ -18,6 +18,7 @@ extern node_map_t HEARTBEAT;
 extern bool MANAGER_CS[NODE_NUM];
 extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
 extern std::map<long, std::map<long, std::list<long>>> MANAGER_BUDGET_MAP;
+extern long_map_t UPSET, DOWNSET;
 
 void init_node(void)
 {
@@ -150,6 +151,8 @@ void node(long id)
 			++REPORT_NODE_STATE_COUNT[my->state];
 			parent->active_node_set[id] = my;
 			ACTIVE_NODE_SET[id] = my;
+			if (UPSET.find(id) != UPSET.end())
+				UPSET.erase(id);
 
 			HEARTBEAT[id] = my;
 		}
@@ -192,6 +195,8 @@ void node(long id)
 			++REPORT_NODE_STATE_COUNT[my->state];
 			parent->standby_node_set[id] = my;
 			STANDBY_NODE_SET[id] = my;
+			if (DOWNSET.find(id) != DOWNSET.end())
+				DOWNSET.erase(id);
 
 			if (parent->state == STATE_ACTIVE && parent->active_node_set.size() == 0) {
 				turnoff_rack(rack);

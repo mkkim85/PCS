@@ -92,7 +92,6 @@ struct job_t
 	struct {
 		double begin;
 		double end;
-		double qin;	
 		double qtotal;
 	} time;
 };
@@ -109,6 +108,18 @@ union msg_t
 	struct {
 		bool power;
 	} power;
+};
+
+struct predict_t
+{
+	struct {
+		long t0;
+		long t1;
+	} load;
+	struct {
+		double t0;
+		double t1;
+	} interval;
 };
 
 //struct rank_cmp {

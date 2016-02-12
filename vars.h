@@ -10,32 +10,31 @@
 #define TIME_UNIT				1.0
 #define MINUTE					60
 #define HOUR					(60 * MINUTE)
-#define MODE_TRANS_INTERVAL		(5 * MINUTE)
 
 // node
-#define NODE_NUM 				1200
-#define CS_NODE_NUM 			(NODE_NUM / REPLICATION_FACTOR)
+#define CS_NODE_NUM				400
+#define NODE_NUM 				(int)(CS_NODE_NUM * REPLICATION_FACTOR)
 #define NODE_U_POWER			129.0		// ACTIVATE
 #define NODE_D_POWER			129.0		// DEACTIVATE
 #define NODE_S_POWER			18.0		// STANDBY
 #define NODE_A_POWER			315.0		// ACTIVE
 #define NODE_U_TIME				100.0		// ACTIVATING TIME (sec)
 #define NODE_D_TIME				11.0		// DEACTIVATING TIME (sec)
-#define MAP_SLOTS				8			// HP(Xeon)
-#define MAP_SLOTS_MAX			(NODE_NUM * MAP_SLOTS)
-#define CPU_CORE				(MAP_SLOTS)
+#define MAP_SLOTS				16			// HP(Xeon)
+#define MAP_SLOTS_MAX			(int)(NODE_NUM * MAP_SLOTS)
+#define CPU_CORE				(int)(MAP_SLOTS)
 #define MEMORY_SIZE				128			// 8 GB, 128 blocks
 #define MEMORY_SPEED			0.003		// 0.003 s/block, PC4-17000, 17,000 MB/s
 #define DISK_SIZE				4000		// 250 GB, 4,000 blocks
-#define DISK_NUM				(CPU_CORE / 2)
+#define DISK_NUM				(int)(CPU_CORE / 2)
 #define DISK_SPEED				0.64		// 0.64 s/block, 100 MB/s
 #define HEARTBEAT_PERIOD		1
 
 // rack
-#define RACK_NUM				150
-#define CS_RACK_NUM				(RACK_NUM / REPLICATION_FACTOR)
-#define NODE_NUM_IN_RACK		(NODE_NUM / RACK_NUM)
-#define SWTICH_NUM				(NODE_NUM_IN_RACK * 1.5)
+#define CS_RACK_NUM				50
+#define RACK_NUM				(int)(CS_RACK_NUM * REPLICATION_FACTOR)
+#define NODE_NUM_IN_RACK		(int)(NODE_NUM / RACK_NUM)
+#define SWTICH_NUM				(int)(NODE_NUM_IN_RACK * 1.5)
 #define RACK_POWER				5940.0		// 5.94 kW
 #define SWITCH_DELAY			0.1
 #define SWITCH_SPEED			0.05		// 0.05 s/block, 10 Gbps, 1.25 GB/s

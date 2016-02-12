@@ -7,11 +7,12 @@ long PREV_REQ_M;
 long MANAGER_BAG_SIZE, MANAGER_BUDGET_SIZE;
 node_map_t MANAGER_CS_NODES;
 std::list<long> INCOMPLETE_MAP_TASKS_Q, PEAK_MAP_TASKS_Q;
-std::list<long_map_t> FILE_ACC_H;
+//std::list<long_map_t> FILE_ACC_H;
 std::list<rack_t*> MANAGER_RANK;
 std::map<long, std::map<long, std::list<long>>> MANAGER_BUDGET_MAP;
+long_map_t UPSET, DOWNSET;
 
-extern bool GROWING_PHASE;
+extern bool GROWING_PHASE, EV_NEW_JOB;
 extern node_t NODES[NODE_NUM];
 extern rack_t RACKS[RACK_NUM];
 extern long REMAIN_MAP_TASKS;
@@ -26,31 +27,30 @@ extern rack_map_t ACTIVE_RACK_NPG_SET, NPG_SET;
 extern mailbox *M_NODE[NODE_NUM];
 extern std::pair<double, long> REPORT_AVG_M;
 extern std::pair<long, long> REPORT_CAP, REPORT_REQ_M;
-extern long CURRENT_MAP_TASKS;
 
 void state_manager(void)
 {
-	double m, mcap;
-	long btrans_t = clock;
-	long req_m, top_k = 0, size;
-	long m_total = 0;
-	long_map_t *bag = NULL;
-
 	if (SETUP_MODE_TYPE == MODE_BASELINE)
 		return;
 
+	double m, mcap, ev_t = 0;
+	long req_m, top_k = 0;
+	long m_total = 0;
+	long_map_t *bag = NULL;
+	predict_t predict = { -1, -1, -1, -1 };
+
 	create("state manager");
 	while (!CSIM_END) {
-		if (stable == false && (long)clock - btrans_t >= MODE_TRANS_INTERVAL)
+		if (stable == false && UPSET.empty() && DOWNSET.empty())
 			stable = true;
 
-		size = FILE_ACC_H.size();
-		if (size >= SETUP_TIME_WINDOW) {
-			FILE_ACC_H.pop_front();
-			--size;
-		}
-		FILE_ACC_H.push_back(GetUnitOfFileAcc());
-		++size;
+		//size = FILE_ACC_H.size();
+		//if (size >= SETUP_TIME_WINDOW) {
+		//	FILE_ACC_H.pop_front();
+		//	--size;
+		//}
+		//FILE_ACC_H.push_back(GetUnitOfFileAcc());
+		//++size;
 
 		if (SETUP_MODE_TYPE == MODE_SIERRA) {
 			if (INCOMPLETE_MAP_TASKS_Q.size() >= (1.0 * HOUR)) {
@@ -69,19 +69,17 @@ void state_manager(void)
 
 		REPORT_AVG_M.first += (double)m_total / (double)INCOMPLETE_MAP_TASKS_Q.size();
 		REPORT_AVG_M.second++;
-		
+
 		REPORT_CAP.first += ACTIVE_NODE_SET.size() * MAP_SLOTS;
 		REPORT_CAP.second++;
 
-		if (SETUP_MODE_TYPE == MODE_SIERRA && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0) {
+		if (SETUP_MODE_TYPE == MODE_SIERRA && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0 && stable == true) {
 			m = 0;
-			for (std::list<long>::iterator it = INCOMPLETE_MAP_TASKS_Q.begin();
-			it != INCOMPLETE_MAP_TASKS_Q.end(); ++it) {
+			for (std::list<long>::iterator it = INCOMPLETE_MAP_TASKS_Q.begin(); it != INCOMPLETE_MAP_TASKS_Q.end(); ++it) {
 				if (m < *it)
 					m = *it;
 			}
 
-			btrans_t = clock;
 			stable = false;
 			req_m = m - (CS_NODE_NUM * MAP_SLOTS);
 			REPORT_REQ_M.first += req_m;
@@ -95,10 +93,9 @@ void state_manager(void)
 			}
 		}
 
-		if (SETUP_MODE_TYPE == MODE_IPACS && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0) {
+		if (SETUP_MODE_TYPE == MODE_IPACS && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0 && stable == true) {
 			m = (double)m_total / (double)SETUP_TIME_WINDOW;
 
-			btrans_t = clock;
 			stable = false;
 			req_m = m - (CS_NODE_NUM * MAP_SLOTS);
 			REPORT_REQ_M.first += req_m;
@@ -110,31 +107,78 @@ void state_manager(void)
 			ActivateNodes(MANAGER_CS, bag);
 		}
 
-		if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_RCS) && stable == true && size >= SETUP_TIME_WINDOW) {
-			//m = (double)m_total / (double)SETUP_TIME_WINDOW;
-			m = REMAIN_MAP_TASKS;
-			mcap = ACTIVE_NODE_SET.size() * MAP_SLOTS;
-
-			if ((m / mcap >= 1 + SETUP_ALPHA && STANDBY_NODE_SET.size() > 0)
-				|| (m / mcap < 1 - SETUP_BETA && ACTIVE_NODE_SET.size() > CS_NODE_NUM)) {
-				btrans_t = clock;
+		if (SETUP_MODE_TYPE == MODE_PCS && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0 && stable == true) {
+			bag = GetPopularBlockList(&top_k);
+			if (bag->empty() == false) {
+				double pload, pint, pval;
 				stable = false;
-				req_m = m - (CS_NODE_NUM * MAP_SLOTS);
+				pload = REMAIN_MAP_TASKS + (REMAIN_MAP_TASKS - predict.load.t1 + predict.load.t1 - predict.load.t0) / 2;
+				pint = (clock - ev_t) + ((clock - ev_t) - predict.interval.t1 + predict.interval.t1 - predict.interval.t0) / 2;
+//				pval = pload / pint * NODE_U_TIME;
+				//req_m = pval - (CS_NODE_NUM * MAP_SLOTS);
+				if ((pload / mcap >= 1 + SETUP_ALPHA && STANDBY_NODE_SET.size() > 0 && pint <= NODE_U_TIME)
+					|| (pload / mcap < 1 - SETUP_BETA && ACTIVE_NODE_SET.size() > CS_NODE_NUM && pint <= NODE_U_TIME))
+					req_m = pload - (CS_NODE_NUM * MAP_SLOTS);
+				else 
+					req_m = (ACTIVE_NODE_SET.size() * MAP_SLOTS) - (CS_NODE_NUM * MAP_SLOTS);
+
+				bag = FindPCS(MANAGER_CS, bag, req_m);
 				REPORT_REQ_M.first += req_m;
 				REPORT_REQ_M.second++;
-
-				if (SETUP_MODE_TYPE == MODE_RCS) {
-					bag = FindRCS(MANAGER_CS, req_m);
-				}
-				else if (SETUP_MODE_TYPE == MODE_PCS) {
-					bag = GetPopularBlockList(&top_k);
-					bag = FindPCS(MANAGER_CS, bag, req_m);
-				}
-
-				ActivateNodes(MANAGER_CS, bag);		
+				ActivateNodes(MANAGER_CS, bag);
 			}
 		}
 
+		if (SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_RCS) {
+			if (EV_NEW_JOB == true) {
+				EV_NEW_JOB = false;
+				double pload, pint, pval;
+				mcap = ACTIVE_NODE_SET.size() * MAP_SLOTS;
+
+				if (predict.load.t0 == -1 || predict.load.t1 == -1) {
+					predict.load.t0 = predict.load.t1;
+					predict.interval.t0 = predict.interval.t1;
+					predict.load.t1 = REMAIN_MAP_TASKS;
+					predict.interval.t1 = clock - ev_t;
+					ev_t = clock;
+				}
+				else {
+					pload = REMAIN_MAP_TASKS + (REMAIN_MAP_TASKS - predict.load.t1 + predict.load.t1 - predict.load.t0) / 2;
+					pint = (clock - ev_t) + ((clock - ev_t) - predict.interval.t1 + predict.interval.t1 - predict.interval.t0) / 2;
+					//pval = pload / pint * NODE_U_TIME;
+
+					predict.load.t0 = predict.load.t1;
+					predict.interval.t0 = predict.interval.t1;
+					predict.load.t1 = REMAIN_MAP_TASKS;
+					predict.interval.t1 = clock - ev_t;
+					ev_t = clock;
+					mcap = ACTIVE_NODE_SET.size() * MAP_SLOTS;
+
+					//if (stable == true && size >= SETUP_TIME_WINDOW
+					//	&& ((pval / mcap >= 1 + SETUP_ALPHA && STANDBY_NODE_SET.size() > 0)
+					//		|| (pval / mcap < 1 - SETUP_BETA && ACTIVE_NODE_SET.size() > CS_NODE_NUM))) {
+					if (stable == true
+						&& ((pload / mcap >= 1 + SETUP_ALPHA && STANDBY_NODE_SET.size() > 0 && pint <= NODE_U_TIME)
+							|| (pload / mcap < 1 - SETUP_BETA && ACTIVE_NODE_SET.size() > CS_NODE_NUM && pint <= NODE_U_TIME))) {
+						stable = false;
+						req_m = pload - (CS_NODE_NUM * MAP_SLOTS);
+
+						REPORT_REQ_M.first += req_m;
+						REPORT_REQ_M.second++;
+
+						if (SETUP_MODE_TYPE == MODE_RCS) {
+							bag = FindRCS(MANAGER_CS, req_m);
+						}
+						else if (SETUP_MODE_TYPE == MODE_PCS) {
+							bag = GetPopularBlockList(&top_k);
+							bag = FindPCS(MANAGER_CS, bag, req_m);
+						}
+
+						ActivateNodes(MANAGER_CS, bag);
+					}
+				}
+			}
+		}
 		hold(TIME_UNIT);
 	}
 }
@@ -352,6 +396,8 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 {
 	long i;
 	msg_t *msg;
+	UPSET.clear();
+	DOWNSET.clear();
 
 	if (SETUP_MODE_TYPE == MODE_PCS && bag != NULL) { // TODO: using bag
 		if (!bag->empty()) {
@@ -500,6 +546,7 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 				msg = new msg_t;
 				msg->power.power = true;
 				M_NODE[i]->send((long)msg);
+				UPSET[i] = 1;
 			}
 		}
 		else {	// turn off nodes
@@ -507,6 +554,7 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 				msg = new msg_t;
 				msg->power.power = false;
 				M_NODE[i]->send((long)msg);
+				DOWNSET[i] = 1;
 			}
 		}
 	}
