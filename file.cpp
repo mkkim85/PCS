@@ -10,10 +10,8 @@ extern long SETUP_TIME_WINDOW;
 extern long SETUP_FILE_SIZE;
 extern node_t NODES[NODE_NUM];
 extern rack_t RACKS[RACK_NUM];
-//extern std::list<long_map_t> FILE_ACC_H;
 extern long SETUP_MODE_TYPE;
 extern std::list<rack_t*> MANAGER_RANK;
-//extern std::priority_queue<rack_t, std::vector<rack_t>, rank_cmp> MANAGER_RANK;
 extern long MANAGER_BAG_SIZE;
 
 void gen_file(void)
@@ -69,102 +67,6 @@ void gen_file(void)
 	}
 }
 
-//long_map_t GetUnitOfFileAcc(void)
-//{
-//	file_t *file;
-//	long_map_t h;
-//	std::map<long ,file_t*>::iterator iter;
-//	for (iter = FILE_MAP.begin(); iter != FILE_MAP.end(); ++iter) {
-//		file = iter->second;
-//		if (file->acc.size() > 1) {
-//			h[file->id] = file->acc.size();
-//		}
-//	}
-//	return h;
-//}
-
-
-//long_map_t* GetPopularBlockList(long *top_k)
-//{
-//	long req, acc, max = 0;
-//	block_t *block;
-//	file_t *file;
-//	std::list<long_map_t>::iterator hiter;
-//	long_map_t::iterator miter;
-//	std::vector<block_t*>::iterator biter;
-//	long_map_t *bag = new long_map_t;
-//
-//	if (SETUP_MODE_TYPE == MODE_PCS) {
-//		MANAGER_BAG_SIZE = 0;
-//
-//		for (long i = 0; i < RACK_NUM; ++i) {
-//			RACKS[i].rank = 0;
-//		}
-//	}
-//
-//	for (hiter = FILE_ACC_H.begin(); hiter != FILE_ACC_H.end(); ++hiter) {
-//		for (miter = hiter->begin(); miter != hiter->end(); ++miter) {
-//			file = FILE_MAP[miter->first];
-//			acc = miter->second;
-//
-//			if (acc > max) {
-//				max = acc;
-//			}
-//
-//			req = MIN(acc, REPLICATION_FACTOR) - 1;
-//			for (biter = file->blocks.begin(); biter != file->blocks.end(); ++biter) {
-//				block = (*biter);
-//				if ((*bag).find(block->id) != (*bag).end()) {
-//					if (SETUP_MODE_TYPE == MODE_PCS) {
-//						long prev = (*bag)[block->id];
-//						long cnt = req;
-//						while (cnt-- > prev) {
-//							++MANAGER_BAG_SIZE;
-//							long_map_t::iterator item = block->local_rack.begin(),
-//								end = block->local_rack.end();
-//
-//							while (++item != end) {
-//								++RACKS[item->first].rank;
-//							}
-//						}
-//					}
-//					(*bag)[block->id] = MAX(req, (*bag)[block->id]);
-//				}
-//				else {
-//					if (SETUP_MODE_TYPE == MODE_PCS) {
-//						long cnt = req;
-//						while (cnt-- > 0) {
-//							++MANAGER_BAG_SIZE;
-//							long_map_t::iterator item = block->local_rack.begin(),
-//								end = block->local_rack.end();
-//
-//							while (++item != end) {
-//								++RACKS[item->first].rank;
-//							}
-//						}
-//					}
-//					(*bag)[block->id] = req;
-//				}
-//			}
-//		}
-//	}
-//
-//	*top_k = max;
-//	if (!bag->empty()) {
-//		if (SETUP_MODE_TYPE == MODE_PCS) {
-//			MANAGER_RANK.clear();
-//			for (long i = CS_RACK_NUM; i < RACK_NUM; ++i) {
-//				MANAGER_RANK.push_back(&RACKS[i]);
-//			}
-//		}
-//
-//		return bag;
-//	}
-//
-//	delete bag;
-//	return NULL;
-//}
-
 long_map_t* GetPopularBlockList(long *top_k)
 {
 	double prevt, curt;
@@ -183,7 +85,7 @@ long_map_t* GetPopularBlockList(long *top_k)
 	prevt = curt - SETUP_TIME_WINDOW;
 	prevt = (prevt > 0 ? prevt : 0);
 
-	if (SETUP_MODE_TYPE == MODE_PCS) {
+	if (SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2) {
 		MANAGER_BAG_SIZE = 0;
 
 		for (long i = 0; i < RACK_NUM; ++i) {
@@ -200,7 +102,13 @@ long_map_t* GetPopularBlockList(long *top_k)
 				acc = lit->second;
 				if (acc > max)
 					max = acc;
-				req = MIN(acc, REPLICATION_FACTOR) - 1;
+
+				if (SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2) {
+					req = acc - 1;
+				}
+				else if (SETUP_MODE_TYPE == MODE_IPACS) {
+					req = MIN(acc, REPLICATION_FACTOR) - 1;
+				}
 
 				if (fmax[file->id] < req)
 					fmax[file->id] = req;
@@ -214,7 +122,7 @@ long_map_t* GetPopularBlockList(long *top_k)
 
 		for (bit = file->blocks.begin(); bit != file->blocks.end(); ++bit) {
 			block = (*bit);
-			if (SETUP_MODE_TYPE == MODE_PCS) {
+			if (SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2) {
 				long_map_t::iterator item = block->local_rack.begin(),
 					end = block->local_rack.end();
 				while (++item != end) {
@@ -231,7 +139,7 @@ long_map_t* GetPopularBlockList(long *top_k)
 
 	*top_k = max;
 	if (!bag->empty()) {
-		if (SETUP_MODE_TYPE == MODE_PCS) {
+		if (SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2) {
 			MANAGER_RANK.clear();
 			for (long i = CS_RACK_NUM; i < RACK_NUM; ++i) {
 				MANAGER_RANK.push_back(&RACKS[i]);

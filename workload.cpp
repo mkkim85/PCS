@@ -40,6 +40,7 @@ void scenario(void)
 		CHANGE_T = 10.0 * HOUR;
 		CUR_INT = SETUP_LOAD_SCENARIO[3];
 		NEXT_INT = SETUP_LOAD_SCENARIO[4];
+	
 		hold(3.0 * HOUR);
 
 		GROWING_PHASE = false;

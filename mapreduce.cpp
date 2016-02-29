@@ -5,7 +5,7 @@ node_map_t HEARTBEAT;
 extern std::map<long, std::list<std::pair<double, long>>> FILE_HISTORY;
 extern node_t NODES[NODE_NUM];
 extern slot_t MAPPER[MAP_SLOTS_MAX];
-extern long REMAIN_MAP_TASKS;
+extern long REMAIN_MAP_TASKS, REPORT_BUDGET_HIT;
 extern mailbox *M_MAPPER[MAP_SLOTS_MAX];
 extern bool CSIM_END;
 extern std::list<job_t*> MAP_QUEUE;
@@ -20,6 +20,7 @@ extern double REPORT_RESP_T_TOTAL, REPORT_Q_DELAY_T_TOTAL;
 extern long REPORT_RESP_T_COUNT, REPORT_Q_DELAY_T_COUNT;
 extern long REPORT_LOCALITY[LOCAL_LENGTH];
 extern std::pair<double, long> REPORT_TASK_T, REPORT_CPU_T, REPORT_MEM_T, REPORT_DISK_T, REPORT_NETWORK_T, REPORT_TASK_Q_T;
+extern std::map<long, std::map<long, bool>> BUDGET_MAP;
 
 void job_tracker(void)
 {
@@ -41,15 +42,7 @@ void job_tracker(void)
 			}
 		}
 
-		/*while ((heartbeat.empty() == false || reuse.empty() == false)
-			&& MAP_QUEUE.empty() == false)*/
 		while (heartbeat.empty() == false && MAP_QUEUE.empty() == false) {
-			//if (heartbeat.empty() == true && reuse.empty() == false)
-			//{	// reusing skipped heartbeats
-			//	heartbeat = reuse;
-			//	reuse.clear();
-			//}
-
 			i = uniform_int(0, heartbeat.size() - 1);
 			node_map_t::iterator it = heartbeat.begin();
 			std::advance(it, uniform_int(0, heartbeat.size() - 1));
@@ -57,7 +50,6 @@ void job_tracker(void)
 			heartbeat.erase(node->id);
 
 			if ((msg = scheduler(node->id)) == NULL) {
-//				reuse[node->id] = node;
 				continue;
 			}
 
@@ -124,12 +116,20 @@ void mapper(long id)
 		long psiz = file->acc.size();
 		++file->acc[job->id];
 		long csiz = file->acc.size();
-		if ((SETUP_MODE_TYPE == MODE_IPACS || SETUP_MODE_TYPE == MODE_PCS)
+		if ((SETUP_MODE_TYPE == MODE_IPACS || SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2)
 			&& csiz > 1 && psiz != csiz) {
 			FILE_HISTORY[file->id].push_back(std::pair<double, long>(clock, csiz));
 		}
 		++parent->mapper.used;
 		MAPPER[id].used = true;
+
+		if (SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2) {
+			if (BUDGET_MAP.find(block->id) != BUDGET_MAP.end()) {
+				if (BUDGET_MAP[block->id].find(node) != BUDGET_MAP[block->id].end()) {
+					++REPORT_BUDGET_HIT;
+				}
+			}
+		}
 
 		if (locality == LOCAL_NODE) {
 			if (cache_hit(node, block->id)) {

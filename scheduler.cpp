@@ -1,12 +1,11 @@
 #include "header.h"
 
-long SKIPPABLE_FACTOR = 10;
-
 extern long SETUP_SCHEDULER_TYPE;
 extern long SETUP_MODE_TYPE;
 extern std::list<job_t*> MAP_QUEUE;
 extern node_t NODES[NODE_NUM];
 extern node_map_t ACTIVE_NODE_SET;
+extern long REPORT_BUDGET_HIT;
 
 bool sort_queue(const job_t *x, const job_t *y)
 {

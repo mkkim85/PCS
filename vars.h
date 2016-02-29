@@ -20,7 +20,7 @@
 #define NODE_A_POWER			315.0		// ACTIVE
 #define NODE_U_TIME				100.0		// ACTIVATING TIME (sec)
 #define NODE_D_TIME				11.0		// DEACTIVATING TIME (sec)
-#define MAP_SLOTS				16			// HP(Xeon)
+#define MAP_SLOTS				8			// HP(Xeon)
 #define MAP_SLOTS_MAX			(int)(NODE_NUM * MAP_SLOTS)
 #define CPU_CORE				(int)(MAP_SLOTS)
 #define MEMORY_SIZE				128			// 8 GB, 128 blocks
@@ -29,6 +29,7 @@
 #define DISK_NUM				(int)(CPU_CORE / 2)
 #define DISK_SPEED				0.64		// 0.64 s/block, 100 MB/s
 #define HEARTBEAT_PERIOD		1
+#define BUDGET_SLOTS			1
 
 // rack
 #define CS_RACK_NUM				50

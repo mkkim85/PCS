@@ -3,7 +3,6 @@
 
 // file.cpp
 void gen_file(void);
-//long_map_t GetUnitOfFileAcc(void);
 long_map_t* GetPopularBlockList(long *top_k);
 block_t* GetBlock(long id);
 
@@ -21,7 +20,6 @@ void logging(char str[]);
 void state_manager(void);
 long_map_t* FindSierra(bool cs[], long top_k, long req_m);
 long_map_t* FindiPACS(bool cs[], long_map_t *bag, long top_k, long req_m);
-long_map_t* FindRCS(bool cs[], long req_m);
 long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m);
 void ActivateNodes(bool cs[], long_map_t *bag);
 bool sort_rank(const rack_t *x, const rack_t *y);

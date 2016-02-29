@@ -2,15 +2,15 @@
 #include <vector>
 #include <list>
 #include <map>
-#include <algorithm>
 #include <queue>
+#include <algorithm>
 #include <sys/stat.h>
 #include "cpp.h"
 
 typedef enum { STATE_ACTIVATE, STATE_DEACTIVATE, STATE_STANDBY, STATE_ACTIVE, STATE_LENGTH } StateTypes;
 typedef enum { O_CPU, O_MEMORY, O_DISK, O_NETWORK, O_QDELAY, O_LENGTH } OverheadTypes;
 typedef enum { LOCAL_NODE, LOCAL_RACK, LOCAL_REMOTE, LOCAL_LENGTH } LocalTypes;
-typedef enum { MODE_BASELINE, MODE_SIERRA, MODE_IPACS, MODE_RCS, MODE_PCS, MODE_LENGTH } ModeTypes;
+typedef enum { MODE_BASELINE, MODE_SIERRA, MODE_IPACS, MODE_PCS1, MODE_PCS2, MODE_LENGTH } ModeTypes;
 typedef enum { FAIR_SCHEDULER, DELAY_SCHEDULER, SCHEDULER_LENGTH } SchedulerTypes;
 
 typedef std::map<long, long> long_map_t;
@@ -109,22 +109,3 @@ union msg_t
 		bool power;
 	} power;
 };
-
-struct predict_t
-{
-	struct {
-		long t0;
-		long t1;
-	} load;
-	struct {
-		double t0;
-		double t1;
-	} interval;
-};
-
-//struct rank_cmp {
-//	bool operator() (const rack_t x, const rack_t y)
-//	{
-//		return x.rank < y.rank;
-//	}
-//};

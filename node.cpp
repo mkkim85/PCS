@@ -5,6 +5,7 @@ node_map_t ACTIVE_NODE_SET, STANDBY_NODE_SET;
 slot_t MAPPER[MAP_SLOTS_MAX];
 long MAX_MAPPER_ID;
 std::list<long> MEMORY[NODE_NUM];
+std::map<long, std::map<long, bool>> BUDGET_MAP;
 
 extern rack_t RACKS[RACK_NUM];
 extern double SETUP_BUDGET_RATIO;
@@ -19,6 +20,7 @@ extern bool MANAGER_CS[NODE_NUM];
 extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
 extern std::map<long, std::map<long, std::list<long>>> MANAGER_BUDGET_MAP;
 extern long_map_t UPSET, DOWNSET;
+extern long REPORT_BUDGET_SIZE;
 
 void init_node(void)
 {
@@ -36,10 +38,10 @@ void init_node(void)
 		prack = &RACKS[i / NODE_NUM_IN_RACK];
 		pnode->space.capacity = DISK_SIZE;
 		pnode->space.used = 0;
-		pnode->space.disk.capacity = DISK_SIZE * (1 - SETUP_BUDGET_RATIO); 
-		pnode->space.disk.used = 0;
-		pnode->space.budget.capacity = DISK_SIZE * SETUP_BUDGET_RATIO; 
+		pnode->space.budget.capacity = ceil((DATA_BLOCK_NUM / CS_NODE_NUM) * SETUP_BUDGET_RATIO); 
 		pnode->space.budget.used = 0;
+		pnode->space.disk.capacity = DISK_SIZE - pnode->space.budget.capacity;
+		pnode->space.disk.used = 0;
 		pnode->space.disk.blocks.clear();
 		pnode->space.budget.blocks.clear();
 
@@ -105,7 +107,8 @@ void node(long id)
 
 		if (r->power.power == true && my->state == STATE_STANDBY) {
 			// Copy replications in budget
-			if (SETUP_MODE_TYPE == MODE_PCS && MANAGER_BUDGET_MAP.find(id) != MANAGER_BUDGET_MAP.end()) {
+			if ((SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2) 
+				&& MANAGER_BUDGET_MAP.find(id) != MANAGER_BUDGET_MAP.end()) {
 				std::map<long, std::list<long>>::iterator it = MANAGER_BUDGET_MAP[id].begin(),
 					itend = MANAGER_BUDGET_MAP[id].end();
 
@@ -131,6 +134,8 @@ void node(long id)
 						else {
 							++b->local_rack[rack];
 						}
+						BUDGET_MAP[b->id][id] = 1;
+						++REPORT_BUDGET_SIZE;
 					}
 					++it;
 				}
@@ -163,7 +168,8 @@ void node(long id)
 			}
 
 			MEMORY[id].clear();
-			if (SETUP_MODE_TYPE == MODE_PCS && !my->space.budget.blocks.empty()) {	// clear budget
+			if ((SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2)
+				&& !my->space.budget.blocks.empty()) {	// clear budget
 				std::map<long, void*>::iterator it = my->space.budget.blocks.begin(),
 					itend = my->space.budget.blocks.end();
 				while (it != itend) {
@@ -175,6 +181,11 @@ void node(long id)
 					if (--parent->blocks[b->id] == 0) {
 						parent->blocks.erase(b->id);
 					}
+					BUDGET_MAP[b->id].erase(id);
+					if (BUDGET_MAP[b->id].empty()) {
+						BUDGET_MAP.erase(b->id);
+					}
+					--REPORT_BUDGET_SIZE;
 					++it;
 				}
 				my->space.budget.blocks.clear();
