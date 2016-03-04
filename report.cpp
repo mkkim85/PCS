@@ -7,7 +7,6 @@ long REPORT_RESP_T_COUNT, REPORT_Q_DELAY_T_COUNT;
 long REPORT_LOCALITY[LOCAL_LENGTH];
 long REPORT_RACK_STATE_COUNT[STATE_LENGTH], REPORT_NODE_STATE_COUNT[STATE_LENGTH];
 long REPORT_MAP_TASKS, REPORT_BUDGET_SIZE, REPORT_BUDGET_HIT;
-long REPORT_TOP_K;
 std::pair<double, long> REPORT_AVG_M;
 std::pair<long, long> REPORT_CAP, REPORT_REQ_M;
 std::pair<double, long> REPORT_TASK_T, REPORT_CPU_T, REPORT_MEM_T, REPORT_DISK_T, REPORT_NETWORK_T, REPORT_TASK_Q_T;
@@ -25,7 +24,7 @@ void sim_report(void)
 	long t;
 	long hold_t = SETUP_REPORT_PERIOD;
 
-	fprintf(SETUP_REPORT_FILE, "clock,kW,total_kW,kW_npg,total_kW_npg,node,rack,total_resp_t,resp_t_count,avg_resp_t,total_q_delay_t,q_delay_count,avg_q_delay,local_node,local_rack,local_remote,map_tasks,task_t,cpu_t,mem_t,disk_t,net_t,task_q_t,avg_m,active_cap,m/cap,req_m,req_node,budget hit,budget size,top k\n");
+	fprintf(SETUP_REPORT_FILE, "clock,kW,total_kW,kW_npg,total_kW_npg,node,rack,total_resp_t,resp_t_count,avg_resp_t,total_q_delay_t,q_delay_count,avg_q_delay,local_node,local_rack,local_remote,map_tasks,task_t,cpu_t,mem_t,disk_t,net_t,task_q_t,avg_m,active_cap,m/cap,req_m,req_node,budget hit,budget size\n");
 	fclose(SETUP_REPORT_FILE);
 
 	create("report");
@@ -63,7 +62,7 @@ void sim_report(void)
 
 			SETUP_REPORT_FILE = fopen(SETUP_REPORT_PATH, "a");
 			fprintf(SETUP_REPORT_FILE, 
-				"%ld,%lf,%lf,%lf,%lf,%ld,%ld,%lf,%ld,%lf,%lf,%ld,%lf,%ld,%ld,%ld,%ld,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%ld,%lf,%ld,%ld,%ld,%ld,%ld\n",
+				"%ld,%lf,%lf,%lf,%lf,%ld,%ld,%lf,%ld,%lf,%lf,%ld,%lf,%ld,%ld,%ld,%ld,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%ld,%lf,%ld,%ld,%ld,%ld\n",
 				(long)clock, REPORT_KW, REPORT_TOTAL_KW, 
 				REPORT_KW_NPG, REPORT_TOTAL_KW_NPG, NN, RN,
 				REPORT_RESP_T_TOTAL, REPORT_RESP_T_COUNT, 
@@ -83,8 +82,7 @@ void sim_report(void)
 				REPORT_CAP.second > 0 ? (double)(REPORT_AVG_M.first / REPORT_AVG_M.second) / (REPORT_CAP.first / REPORT_CAP.second) : 0,
 				REPORT_REQ_M.second > 0 ? (long)(REPORT_REQ_M.first / REPORT_REQ_M.second) : 0,
 				REPORT_REQ_M.second > 0 ? (long)ceil((REPORT_REQ_M.first / REPORT_REQ_M.second) / MAP_SLOTS) : 0,
-				REPORT_BUDGET_HIT, REPORT_BUDGET_SIZE,
-				REPORT_TOP_K);
+				REPORT_BUDGET_HIT, REPORT_BUDGET_SIZE);
 			fclose(SETUP_REPORT_FILE);
 
 			REPORT_KW = 0;

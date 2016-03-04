@@ -6,12 +6,13 @@ std::map<long, file_t*> FILE_MAP;
 std::vector<file_t*> FILE_VEC[CS_RACK_NUM];
 std::map<long, std::list<std::pair<double, long>>> FILE_HISTORY;
 
-extern long SETUP_TIME_WINDOW, SETUP_FILE_SIZE, SETUP_MODE_TYPE;
-extern long MANAGER_BAG_SIZE;
-extern long REPORT_TOP_K;
+extern long SETUP_TIME_WINDOW;
+extern long SETUP_FILE_SIZE;
 extern node_t NODES[NODE_NUM];
 extern rack_t RACKS[RACK_NUM];
+extern long SETUP_MODE_TYPE;
 extern std::list<rack_t*> MANAGER_RANK;
+extern long MANAGER_BAG_SIZE;
 
 void gen_file(void)
 {
@@ -136,7 +137,7 @@ long_map_t* GetPopularBlockList(long *top_k)
 		}
 	}
 
-	REPORT_TOP_K = *top_k = max;
+	*top_k = max;
 	if (!bag->empty()) {
 		if (SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2) {
 			MANAGER_RANK.clear();

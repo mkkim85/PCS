@@ -2,7 +2,6 @@
 
 node_map_t HEARTBEAT;
 
-extern std::map<long, job_t*> JOB_MAP;
 extern std::map<long, std::list<std::pair<double, long>>> FILE_HISTORY;
 extern node_t NODES[NODE_NUM];
 extern slot_t MAPPER[MAP_SLOTS_MAX];
@@ -31,7 +30,7 @@ void job_tracker(void)
 
 	create("job_tracker");
 	while (!CSIM_END) {
-		//	node_map_t heartbeat, reuse;
+	//	node_map_t heartbeat, reuse;
 		node_map_t heartbeat;
 
 		if (MAP_QUEUE.empty() == false && HEARTBEAT.empty() == false) {
@@ -129,7 +128,6 @@ void mapper(long id)
 				if (BUDGET_MAP[block->id].find(node) != BUDGET_MAP[block->id].end()) {
 					++REPORT_BUDGET_HIT;
 				}
-
 			}
 		}
 
@@ -171,7 +169,7 @@ void mapper(long id)
 		cpu_t = abs(clock - bcpu);
 		T_TASK_TIMES[O_CPU]->record(cpu_t);
 		REPORT_CPU_T.first += cpu_t;
-		REPORT_CPU_T.second++;
+		REPORT_CPU_T.second++;	
 
 		if (--file->acc[job->id] <= 0) {
 			file->acc.erase(job->id);
@@ -189,8 +187,6 @@ void mapper(long id)
 			++REPORT_RESP_T_COUNT;
 			REPORT_Q_DELAY_T_TOTAL += job->time.qtotal;
 			++REPORT_Q_DELAY_T_COUNT;
-			JOB_MAP.erase(job->id);
-			delete job;
 		}
 
 		if (node >= CS_NODE_NUM) {
