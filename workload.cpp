@@ -1,9 +1,9 @@
 #include "header.h"
 
-bool GROWING_PHASE, EV_NEW_JOB = false;
+bool EV_NEW_JOB = false;
 long REMAIN_MAP_TASKS;
 long MAX_JOB_ID;
-double CHANGE_T, CUR_INT, NEXT_INT;
+double CHANGE_T, CUR_INT, NEXT_INT, CHG_PERIOD;
 std::map<long, job_t*> JOB_MAP;
 std::list<job_t*> MAP_QUEUE;
 
@@ -17,34 +17,29 @@ void scenario(void)
 {
 	if (FB_WORKLOAD == false) {
 		create("scenario");
-		GROWING_PHASE = true;
-		CHANGE_T = 0.5 * HOUR;
+		CHANGE_T = 0;
+		CHG_PERIOD = 2 * HOUR;
 		CUR_INT = SETUP_LOAD_SCENARIO[0];
 		NEXT_INT = SETUP_LOAD_SCENARIO[1];
-		hold(1.5 * HOUR);
+		hold(2 * HOUR);
 
-		CHANGE_T = 4.5 * HOUR;
+		CHANGE_T = 3.5 * HOUR;
+		CHG_PERIOD = 1.5 * HOUR;
 		CUR_INT = SETUP_LOAD_SCENARIO[1];
 		NEXT_INT = SETUP_LOAD_SCENARIO[2];
-		hold(3.0 * HOUR);
+		hold(3 * HOUR);
 
-		GROWING_PHASE = false;
-		hold(1.5 * HOUR);
-
-		GROWING_PHASE = true;
-		CHANGE_T = 6.0 * HOUR;
+		CHANGE_T = 5.5 * HOUR;
+		CHG_PERIOD = 1.5 * HOUR;
 		CUR_INT = SETUP_LOAD_SCENARIO[2];
 		NEXT_INT = SETUP_LOAD_SCENARIO[3];
-		hold(1.0 * HOUR);
+		hold(2 * HOUR);
 
-		CHANGE_T = 10.0 * HOUR;
+		CHANGE_T = 8.5 * HOUR;
+		CHG_PERIOD = 2 * HOUR;
 		CUR_INT = SETUP_LOAD_SCENARIO[3];
 		NEXT_INT = SETUP_LOAD_SCENARIO[4];
-	
-		hold(3.0 * HOUR);
-
-		GROWING_PHASE = false;
-		hold(1.5 * HOUR);
+		hold(3.5 * HOUR);
 
 		CSIM_END = true;
 	}
@@ -126,7 +121,7 @@ void workload(void)
 	}
 	else {
 		long i, n, max;
-		double sec, period = 1.0 * HOUR;;
+		double sec;
 		double u, std, t;
 		file_t *file;
 		job_t *job;
@@ -182,9 +177,9 @@ void workload(void)
 
 			if (sec > CHANGE_T) {
 				if (CUR_INT > NEXT_INT)
-					u = CUR_INT - (abs(CUR_INT - NEXT_INT) / period * (sec - CHANGE_T));
+					u = CUR_INT - (abs(CUR_INT - NEXT_INT) / CHG_PERIOD * (sec - CHANGE_T));
 				else
-					u = CUR_INT + (abs(CUR_INT - NEXT_INT) / period * (sec - CHANGE_T));
+					u = CUR_INT + (abs(CUR_INT - NEXT_INT) / CHG_PERIOD * (sec - CHANGE_T));
 			}
 			else {
 				u = CUR_INT;
