@@ -37,7 +37,7 @@ void state_manager(void)
 	long req_m, top_k = 0;
 	long m_total = 0;
 	long_map_t *bag = NULL;
-	
+
 	create("state manager");
 	while (!CSIM_END) {
 		if (stable == false && UPSET.empty() && DOWNSET.empty())
@@ -81,14 +81,12 @@ void state_manager(void)
 				REPORT_REQ_M.first += req_m;
 				REPORT_REQ_M.second++;
 
-				bag = GetPopularBlockList(&top_k);
 				bag = FindiPACS(MANAGER_CS, bag, top_k, req_m);
 				ActivateNodes(MANAGER_CS, bag);
 			}
 		}
 
-		if ((SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2)
-			&& clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0 && stable == true) {
+		if (SETUP_MODE_TYPE == MODE_PCS && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0 && stable == true) {
 			m = 0;
 			for (std::list<long>::iterator it = INCOMPLETE_MAP_TASKS_Q.begin(); it != INCOMPLETE_MAP_TASKS_Q.end(); ++it) {
 				if (m < *it)
@@ -222,10 +220,7 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 			if (MANAGER_CS[node->id] == false) {
 				MANAGER_CS_NODES[node->id] = node;
 				MANAGER_CS[node->id] = true;
-				if (SETUP_MODE_TYPE == MODE_PCS1)
-					req_m = req_m - MAP_SLOTS;
-				else if (SETUP_MODE_TYPE = MODE_PCS2)
-					req_m = req_m - (MAP_SLOTS - BUDGET_SLOTS);
+				req_m = req_m - MAP_SLOTS;
 				
 				// Invalidate replicas of n's storage budget that are not appeared in bag;
 				std::map<long, void*>::iterator itr = node->space.budget.blocks.begin(),
@@ -303,118 +298,115 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 	UPSET.clear();
 	DOWNSET.clear();
 
-	if ((SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2) 
-		&& bag != NULL) { // TODO: using bag
-		if (!bag->empty()) {
-			long listSize = MANAGER_BAG_SIZE;
-			long sBudgetSize = MANAGER_BUDGET_SIZE;
+	if (SETUP_MODE_TYPE && !bag->empty()) { // TODO: using bag
+		long listSize = MANAGER_BAG_SIZE;
+		long sBudgetSize = MANAGER_BUDGET_SIZE;
 
-			if (MANAGER_CS_NODES.size() == 1) {	// turn on two nodes more for distribute replications
-				node_t *node = MANAGER_CS_NODES.begin()->second;
-				for (i = 0; i < 2; ++i) {
-					node = &NODES[node->id + 1];
-					MANAGER_CS_NODES[node->id] = node;
-					MANAGER_CS[node->id] = true;
-					std::map<long, void*>::iterator itr = node->space.budget.blocks.begin(), iend = node->space.budget.blocks.end();
-					while (itr != iend) {
-						block_t *b = (block_t*)itr->second;
-						if (bag->find(b->id) == bag->end()) {
-							b->local_node.erase(node->id);
-							b->local_rack.erase(GET_RACK_FROM_NODE(node->id));
-							node->space.budget.blocks.erase(itr++);
-							--node->space.used;
-							--node->space.budget.used;
+		if (MANAGER_CS_NODES.size() == 1) {	// turn on two nodes more for distribute replications
+			node_t *node = MANAGER_CS_NODES.begin()->second;
+			for (i = 0; i < 2; ++i) {
+				node = &NODES[node->id + 1];
+				MANAGER_CS_NODES[node->id] = node;
+				MANAGER_CS[node->id] = true;
+				std::map<long, void*>::iterator itr = node->space.budget.blocks.begin(), iend = node->space.budget.blocks.end();
+				while (itr != iend) {
+					block_t *b = (block_t*)itr->second;
+					if (bag->find(b->id) == bag->end()) {
+						b->local_node.erase(node->id);
+						b->local_rack.erase(GET_RACK_FROM_NODE(node->id));
+						node->space.budget.blocks.erase(itr++);
+						--node->space.used;
+						--node->space.budget.used;
 
-							BUDGET_MAP[b->id].erase(node->id);
-							if (BUDGET_MAP[b->id].empty()) {
-								BUDGET_MAP.erase(b->id);
-							}
-							--REPORT_BUDGET_SIZE;
+						BUDGET_MAP[b->id].erase(node->id);
+						if (BUDGET_MAP[b->id].empty()) {
+							BUDGET_MAP.erase(b->id);
 						}
-						else {
-							++itr;
-						}
+						--REPORT_BUDGET_SIZE;
 					}
-					itr = node->space.disk.blocks.begin(), iend = node->space.disk.blocks.end();
-					while (itr != iend) {	// disk
-						block_t *b = (block_t*)itr->second;
-						if (bag->find(b->id) != bag->end()) {
-							if (--(*bag)[b->id] == 0) {
-								bag->erase(b->id);
-							}
-							--listSize;
-						}
+					else {
 						++itr;
 					}
-					itr = node->space.budget.blocks.begin(), iend = node->space.budget.blocks.end();
-					while (itr != iend) {	// budget
-						block_t *b = (block_t*)itr->second;
-						if (bag->find(b->id) != bag->end()) {
-							if (--(*bag)[b->id] == 0) {
-								bag->erase(b->id);
-							}
-							--listSize;
-						}
-						++itr;
-					}
-					sBudgetSize = sBudgetSize + (node->space.budget.capacity - node->space.budget.used);
 				}
-			}
-
-			MANAGER_BUDGET_MAP.clear();
-			std::list<std::pair<long, long>> nlist;
-			node_map_t::iterator it = MANAGER_CS_NODES.begin(), itend = MANAGER_CS_NODES.end();
-			long_map_t nb;
-			while (it != itend) {
-				node_t *node = it->second;
-				long nBudgetSize = node->space.budget.capacity - node->space.budget.used;
-				nb[node->id] = ceil(((double)nBudgetSize / sBudgetSize) * listSize);
-				
-				++it;
-			}
-
-			it = MANAGER_CS_NODES.begin(), itend = MANAGER_CS_NODES.end();
-			long iterNum = listSize;
-			while (it != itend) {
-				// transfer nb blocks of B from any source nodes to n
-				// B = B - list of transferred blocks
-				node_t *node = it->second;
-				long cnt = 0, max_cnt = nb[node->id];
-				long_map_t::iterator bit;
-				block_t *b;
-				bool same_rack = false;
-				long check_cnt = 0;
-				while (cnt < max_cnt && bag->empty() == false) {
-					do {
-						bit = bag->begin();
-						std::advance(bit, uniform_int(0, bag->size() - 1));
-						b = GetBlock(bit->first);
-						node_map_t::iterator nit = b->local_node.begin();
-						same_rack = false;
-						while (nit != b->local_node.end()) {
-							if (GET_RACK_FROM_NODE(nit->second->id)
-								== GET_RACK_FROM_NODE(node->id)) {
-								same_rack = true;
-								check_cnt++;
-								break;
-							}
-							++nit;
+				itr = node->space.disk.blocks.begin(), iend = node->space.disk.blocks.end();
+				while (itr != iend) {	// disk
+					block_t *b = (block_t*)itr->second;
+					if (bag->find(b->id) != bag->end()) {
+						if (--(*bag)[b->id] == 0) {
+							bag->erase(b->id);
 						}
-						if (same_rack == false || check_cnt > iterNum) {
-							check_cnt = 0;
+						--listSize;
+					}
+					++itr;
+				}
+				itr = node->space.budget.blocks.begin(), iend = node->space.budget.blocks.end();
+				while (itr != iend) {	// budget
+					block_t *b = (block_t*)itr->second;
+					if (bag->find(b->id) != bag->end()) {
+						if (--(*bag)[b->id] == 0) {
+							bag->erase(b->id);
+						}
+						--listSize;
+					}
+					++itr;
+				}
+				sBudgetSize = sBudgetSize + (node->space.budget.capacity - node->space.budget.used);
+			}
+		}
+
+		MANAGER_BUDGET_MAP.clear();
+		std::list<std::pair<long, long>> nlist;
+		node_map_t::iterator it = MANAGER_CS_NODES.begin(), itend = MANAGER_CS_NODES.end();
+		long_map_t nb;
+		while (it != itend) {
+			node_t *node = it->second;
+			long nBudgetSize = node->space.budget.capacity - node->space.budget.used;
+			nb[node->id] = ceil(((double)nBudgetSize / sBudgetSize) * listSize);
+
+			++it;
+		}
+
+		it = MANAGER_CS_NODES.begin(), itend = MANAGER_CS_NODES.end();
+		long iterNum = listSize;
+		while (it != itend) {
+			// transfer nb blocks of B from any source nodes to n
+			// B = B - list of transferred blocks
+			node_t *node = it->second;
+			long cnt = 0, max_cnt = nb[node->id];
+			long_map_t::iterator bit;
+			block_t *b;
+			bool same_rack = false;
+			long check_cnt = 0;
+			while (cnt < max_cnt && bag->empty() == false) {
+				do {
+					bit = bag->begin();
+					std::advance(bit, uniform_int(0, bag->size() - 1));
+					b = GetBlock(bit->first);
+					node_map_t::iterator nit = b->local_node.begin();
+					same_rack = false;
+					while (nit != b->local_node.end()) {
+						if (GET_RACK_FROM_NODE(nit->second->id)
+							== GET_RACK_FROM_NODE(node->id)) {
+							same_rack = true;
+							check_cnt++;
 							break;
 						}
-					} while (true);
-					MANAGER_BUDGET_MAP[node->id][GET_RACK_FROM_NODE(node->id)].push_back(b->id);
-					if (--(*bag)[b->id] == 0) {
-						bag->erase(b->id);
+						++nit;
 					}
-					--iterNum;
-					++cnt;
+					if (same_rack == false || check_cnt > iterNum) {
+						check_cnt = 0;
+						break;
+					}
+				} while (true);
+				MANAGER_BUDGET_MAP[node->id][GET_RACK_FROM_NODE(node->id)].push_back(b->id);
+				if (--(*bag)[b->id] == 0) {
+					bag->erase(b->id);
 				}
-				nb[node->id] = 0;
-				++it;
+				--iterNum;
+				++cnt;
 			}
+			nb[node->id] = 0;
+			++it;
 		}
 	}
 
@@ -437,6 +429,8 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 			}
 		}
 	}
+
+	delete bag;
 }
 
 bool sort_rank(const rack_t *x, const rack_t *y)

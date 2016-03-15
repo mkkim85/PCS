@@ -107,8 +107,7 @@ void node(long id)
 
 		if (r->power.power == true && my->state == STATE_STANDBY) {
 			// Copy replications in budget
-			if ((SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2) 
-				&& MANAGER_BUDGET_MAP.find(id) != MANAGER_BUDGET_MAP.end()) {
+			if (SETUP_MODE_TYPE == MODE_PCS && MANAGER_BUDGET_MAP.find(id) != MANAGER_BUDGET_MAP.end()) {
 				std::map<long, std::list<long>>::iterator it = MANAGER_BUDGET_MAP[id].begin(),
 					itend = MANAGER_BUDGET_MAP[id].end();
 
@@ -168,8 +167,7 @@ void node(long id)
 			}
 
 			MEMORY[id].clear();
-			if ((SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2)
-				&& !my->space.budget.blocks.empty()) {	// clear budget
+			if (SETUP_MODE_TYPE == MODE_PCS && !my->space.budget.blocks.empty()) {	// clear budget
 				std::map<long, void*>::iterator it = my->space.budget.blocks.begin(),
 					itend = my->space.budget.blocks.end();
 				while (it != itend) {

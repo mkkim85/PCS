@@ -117,14 +117,14 @@ void mapper(long id)
 		long psiz = file->acc.size();
 		++file->acc[job->id];
 		long csiz = file->acc.size();
-		if ((SETUP_MODE_TYPE == MODE_IPACS || SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2)
+		if ((SETUP_MODE_TYPE == MODE_IPACS || SETUP_MODE_TYPE == MODE_PCS)
 			&& csiz > 1 && psiz != csiz) {
 			FILE_HISTORY[file->id].push_back(std::pair<double, long>(clock, csiz));
 		}
 		++parent->mapper.used;
 		MAPPER[id].used = true;
 
-		if (SETUP_MODE_TYPE == MODE_PCS1 || SETUP_MODE_TYPE == MODE_PCS2) {
+		if (SETUP_MODE_TYPE == MODE_PCS) {
 			if (BUDGET_MAP.find(block->id) != BUDGET_MAP.end()) {
 				if (BUDGET_MAP[block->id].find(node) != BUDGET_MAP[block->id].end()) {
 					++REPORT_BUDGET_HIT;
