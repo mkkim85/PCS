@@ -3,10 +3,10 @@
 long MAX_FILE_ID, MAX_BLOCK_ID;
 struct block_t BLOCK_ARR[DATA_BLOCK_NUM];
 std::map<long, file_t*> FILE_MAP;
-std::vector<file_t*> FILE_VEC[CS_RACK_NUM];
+std::vector<file_t*> FILE_VEC[MOD_NUM];
 std::map<long, std::list<std::pair<double, long>>> FILE_HISTORY;
 
-extern long SETUP_TIME_WINDOW, SETUP_FILE_SIZE, SETUP_MODE_TYPE;
+extern long SETUP_TIME_WINDOW, SETUP_FILE_SIZE, SETUP_MODE_TYPE, SETUP_DATA_LAYOUT, SETUP_LIMIT_K;
 extern long MANAGER_BAG_SIZE;
 extern long REPORT_TOP_K;
 extern node_t NODES[NODE_NUM];
@@ -15,7 +15,7 @@ extern std::list<rack_t*> MANAGER_RANK;
 
 void gen_file(void)
 {
-	long i, j, node, rack, min, max, sum = 0;
+	long i, j, node, rack, min, max, sum = 0, g;
 	block_t *b;
 	file_t *f;
 	FILE_HISTORY.clear();
@@ -25,15 +25,15 @@ void gen_file(void)
 		f->id = MAX_FILE_ID;
 		f->acc.clear();
 
-		rack = MAX_FILE_ID % CS_RACK_NUM;
+		g = MAX_FILE_ID % MOD_NUM;
 
 		for (i = 0; i < SETUP_FILE_SIZE; ++i) {
 			b = &BLOCK_ARR[MAX_BLOCK_ID];
 			b->id = MAX_BLOCK_ID;
 			b->file_id = f->id;
 
-			min = rack * NODE_NUM_IN_RACK;
-			max = min + NODE_NUM_IN_RACK - 1;
+			min = g * PARTITION_NODE_NUM;
+			max = min + PARTITION_NODE_NUM - 1;
 
 			node = uniform_int(min, max);
 			b->local_node[node] = &NODES[node];
@@ -44,13 +44,26 @@ void gen_file(void)
 			RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
 
 			for (j = 1; j < REPLICATION_FACTOR; ++j) {
-				node = node + CS_NODE_NUM;
-				b->local_node[node] = &NODES[node];
-				b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
-				++NODES[node].space.used;
-				++NODES[node].space.disk.used;
-				NODES[node].space.disk.blocks[b->id] = b;
-				RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
+				if (SETUP_DATA_LAYOUT == 1) {
+					node = node + CS_NODE_NUM;
+					b->local_node[node] = &NODES[node];
+					b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
+					++NODES[node].space.used;
+					++NODES[node].space.disk.used;
+					NODES[node].space.disk.blocks[b->id] = b;
+					RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
+				}
+				else {
+					long nmin = CS_NODE_NUM * j;
+					long nmax = nmin + CS_NODE_NUM - 1;
+					node = uniform_int(nmin, nmax);
+					b->local_node[node] = &NODES[node];
+					b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
+					++NODES[node].space.used;
+					++NODES[node].space.disk.used;
+					NODES[node].space.disk.blocks[b->id] = b;
+					RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
+				}
 			}
 
 			f->blocks.push_back(b);
@@ -60,7 +73,7 @@ void gen_file(void)
 		f->size = SETUP_FILE_SIZE;
 
 		FILE_MAP[MAX_FILE_ID] = f;
-		FILE_VEC[rack].push_back(f);
+		FILE_VEC[g].push_back(f);
 		sum = sum + SETUP_FILE_SIZE;
 		++MAX_FILE_ID;
 	}
@@ -103,7 +116,7 @@ long_map_t* GetPopularBlockList(long *top_k)
 					max = acc;
 
 				if (SETUP_MODE_TYPE == MODE_PCS) {
-					req = acc - 1;
+					req = MIN(acc, SETUP_LIMIT_K) - 1;
 				}
 				else if (SETUP_MODE_TYPE == MODE_IPACS) {
 					req = MIN(acc, REPLICATION_FACTOR) - 1;

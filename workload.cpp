@@ -8,7 +8,7 @@ std::map<long, job_t*> JOB_MAP;
 std::list<job_t*> MAP_QUEUE;
 
 extern bool CSIM_END;
-extern std::vector<file_t*> FILE_VEC[CS_RACK_NUM];
+extern std::vector<file_t*> FILE_VEC[MOD_NUM];
 extern double SETUP_DATA_SKEW;
 extern double SETUP_LOAD_SCENARIO[5];
 extern long REPORT_MAP_TASKS;

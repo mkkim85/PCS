@@ -21,6 +21,7 @@ extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
 extern std::map<long, std::map<long, std::list<long>>> MANAGER_BUDGET_MAP;
 extern long_map_t UPSET, DOWNSET;
 extern long REPORT_BUDGET_SIZE;
+extern long SETUP_NODE_UPTIME;
 
 void init_node(void)
 {
@@ -148,7 +149,7 @@ void node(long id)
 			parent->standby_node_set.erase(id);
 			STANDBY_NODE_SET.erase(id);
 
-			hold(NODE_U_TIME);
+			hold(SETUP_NODE_UPTIME);
 
 			--REPORT_NODE_STATE_COUNT[my->state];
 			my->state = STATE_ACTIVE;

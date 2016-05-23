@@ -298,7 +298,7 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 	UPSET.clear();
 	DOWNSET.clear();
 
-	if (SETUP_MODE_TYPE && !bag->empty()) { // TODO: using bag
+	if (SETUP_MODE_TYPE == MODE_PCS && !bag->empty()) { // TODO: using bag
 		long listSize = MANAGER_BAG_SIZE;
 		long sBudgetSize = MANAGER_BUDGET_SIZE;
 
