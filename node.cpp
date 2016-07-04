@@ -22,6 +22,7 @@ extern std::map<long, std::map<long, std::list<long>>> MANAGER_BUDGET_MAP;
 extern long_map_t UPSET, DOWNSET;
 extern long REPORT_BUDGET_SIZE;
 extern long SETUP_NODE_UPTIME;
+extern std::unordered_map<long, block_t*> BLOCK_MAP;
 
 void init_node(void)
 {
@@ -39,7 +40,7 @@ void init_node(void)
 		prack = &RACKS[i / NODE_NUM_IN_RACK];
 		pnode->space.capacity = DISK_SIZE;
 		pnode->space.used = 0;
-		pnode->space.budget.capacity = ceil((DATA_BLOCK_NUM / CS_NODE_NUM) * SETUP_BUDGET_RATIO); 
+		pnode->space.budget.capacity = ceil((BLOCK_MAP.size() / CS_NODE_NUM) * SETUP_BUDGET_RATIO); 
 		pnode->space.budget.used = 0;
 		pnode->space.disk.capacity = DISK_SIZE - pnode->space.budget.capacity;
 		pnode->space.disk.used = 0;

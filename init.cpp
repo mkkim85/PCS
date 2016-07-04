@@ -23,9 +23,9 @@ void init(void)
 	i = max_events(MAX_EVENTS);
 
 	zipf();
+	gen_file();
 	init_rack();
 	init_node();
-	gen_file();
 
 	sprintf(str, "mSwitch");
 	F_MASTER_SWITCH = new facility(str);

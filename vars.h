@@ -1,8 +1,9 @@
 // simulation parameters
 //#define REPLICA_LIMIT			INT_MAX		//INT_MAX
 //#define RAND_LAYOUT				false
-#define FB_WORKLOAD				false
+#define FB_WORKLOAD				true
 #define FB_PATH					"files/workload.txt"
+#define FB_DATA_PATH			"files/data.txt"
 #define FB_LOAD_RATIO			0.3
 #define LOGGING					false
 #define REPLICATION_FACTOR		3

@@ -1,8 +1,9 @@
 #include "header.h"
 
 long MAX_FILE_ID, MAX_BLOCK_ID;
-struct block_t BLOCK_ARR[DATA_BLOCK_NUM];
-std::map<long, file_t*> FILE_MAP;
+//struct block_t BLOCK_ARR[DATA_BLOCK_NUM];
+std::unordered_map<long, block_t*> BLOCK_MAP;
+std::unordered_map<long, file_t*> FILE_MAP;
 std::vector<file_t*> FILE_VEC[MOD_NUM];
 std::map<long, std::list<std::pair<double, long>>> FILE_HISTORY;
 
@@ -20,62 +21,130 @@ void gen_file(void)
 	file_t *f;
 	FILE_HISTORY.clear();
 
-	while (sum < DATA_BLOCK_NUM) {
-		f = new file_t;
-		f->id = MAX_FILE_ID;
-		f->acc.clear();
+	if (FB_WORKLOAD == true) {
+		FILE *fd = fopen(FB_DATA_PATH, "r");
+		long node_id = 0, prev_fid = -1;
+		long job_id, maps, shuffles, reduces, file_id;
+		double gen_t, hold_t;
 
-		g = MAX_FILE_ID % MOD_NUM;
+		if (fd == NULL) exit(EXIT_FAILURE);
+		while (EOF != fscanf(fd, "%ld%lf%lf%ld%ld%ld%ld", &job_id, &gen_t, &hold_t, &maps, &shuffles, &reduces, &file_id)) {
+			if (FILE_MAP.find(file_id) != FILE_MAP.end()) continue;
+			maps = ceil((double)maps * FB_LOAD_RATIO);
+			if (maps > 0) {
+				f = new file_t;
+				f->id = file_id;
+				f->acc.clear();
 
-		for (i = 0; i < SETUP_FILE_SIZE; ++i) {
-			b = &BLOCK_ARR[MAX_BLOCK_ID];
-			b->id = MAX_BLOCK_ID;
-			b->file_id = f->id;
+				for (i = 0; i < maps; ++i) {
+					b = BLOCK_MAP[MAX_BLOCK_ID] = new block_t;
+					b->id = MAX_BLOCK_ID;
+					b->file_id = f->id;
 
-			min = g * PARTITION_NODE_NUM;
-			max = min + PARTITION_NODE_NUM - 1;
-
-			node = uniform_int(min, max);
-			b->local_node[node] = &NODES[node];
-			b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
-			++NODES[node].space.used;
-			++NODES[node].space.disk.used;
-			NODES[node].space.disk.blocks[b->id] = b;
-			RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
-
-			for (j = 1; j < REPLICATION_FACTOR; ++j) {
-				if (SETUP_DATA_LAYOUT == 1) {
-					node = node + CS_NODE_NUM;
+					node = node_id++;
+					node_id = node_id >= CS_NODE_NUM ? (0) : node_id;
 					b->local_node[node] = &NODES[node];
 					b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
 					++NODES[node].space.used;
 					++NODES[node].space.disk.used;
 					NODES[node].space.disk.blocks[b->id] = b;
 					RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
+
+					for (j = 1; j < REPLICATION_FACTOR; ++j) {
+						if (SETUP_DATA_LAYOUT == 1) {
+							node = node + CS_NODE_NUM;
+							b->local_node[node] = &NODES[node];
+							b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
+							++NODES[node].space.used;
+							++NODES[node].space.disk.used;
+							NODES[node].space.disk.blocks[b->id] = b;
+							RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
+						}
+						else {
+							long nmin = CS_NODE_NUM * j;
+							long nmax = nmin + CS_NODE_NUM - 1;
+							node = uniform_int(nmin, nmax);
+							b->local_node[node] = &NODES[node];
+							b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
+							++NODES[node].space.used;
+							++NODES[node].space.disk.used;
+							NODES[node].space.disk.blocks[b->id] = b;
+							RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
+						}
+					}
+
+					f->blocks.push_back(b);
+
+					++MAX_BLOCK_ID;
 				}
-				else {
-					long nmin = CS_NODE_NUM * j;
-					long nmax = nmin + CS_NODE_NUM - 1;
-					node = uniform_int(nmin, nmax);
-					b->local_node[node] = &NODES[node];
-					b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
-					++NODES[node].space.used;
-					++NODES[node].space.disk.used;
-					NODES[node].space.disk.blocks[b->id] = b;
-					RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
-				}
+				f->size = maps;
+
+				FILE_MAP[f->id] = f;
+				//FILE_VEC[g].push_back(f);
+				sum = sum + maps;
+				++MAX_FILE_ID;
 			}
-
-			f->blocks.push_back(b);
-
-			++MAX_BLOCK_ID;
 		}
-		f->size = SETUP_FILE_SIZE;
+		fclose(fd);
+	}
+	else {
+		while (sum < DATA_BLOCK_NUM) {
+			f = new file_t;
+			f->id = MAX_FILE_ID;
+			f->acc.clear();
 
-		FILE_MAP[MAX_FILE_ID] = f;
-		FILE_VEC[g].push_back(f);
-		sum = sum + SETUP_FILE_SIZE;
-		++MAX_FILE_ID;
+			g = MAX_FILE_ID % MOD_NUM;
+
+			for (i = 0; i < SETUP_FILE_SIZE; ++i) {
+				b = BLOCK_MAP[MAX_BLOCK_ID] = new block_t;
+				b->id = MAX_BLOCK_ID;
+				b->file_id = f->id;
+
+				min = g * PARTITION_NODE_NUM;
+				max = min + PARTITION_NODE_NUM - 1;
+
+				node = uniform_int(min, max);
+				b->local_node[node] = &NODES[node];
+				b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
+				++NODES[node].space.used;
+				++NODES[node].space.disk.used;
+				NODES[node].space.disk.blocks[b->id] = b;
+				RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
+
+				for (j = 1; j < REPLICATION_FACTOR; ++j) {
+					if (SETUP_DATA_LAYOUT == 1) {
+						node = node + CS_NODE_NUM;
+						b->local_node[node] = &NODES[node];
+						b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
+						++NODES[node].space.used;
+						++NODES[node].space.disk.used;
+						NODES[node].space.disk.blocks[b->id] = b;
+						RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
+					}
+					else {
+						long nmin = CS_NODE_NUM * j;
+						long nmax = nmin + CS_NODE_NUM - 1;
+						node = uniform_int(nmin, nmax);
+						b->local_node[node] = &NODES[node];
+						b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
+						++NODES[node].space.used;
+						++NODES[node].space.disk.used;
+						NODES[node].space.disk.blocks[b->id] = b;
+						RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
+					}
+				}
+
+				f->blocks.push_back(b);
+
+				++MAX_BLOCK_ID;
+			}
+			f->size = SETUP_FILE_SIZE;
+
+			FILE_MAP[MAX_FILE_ID] = f;
+			FILE_VEC[g].push_back(f);
+			sum = sum + SETUP_FILE_SIZE;
+			++MAX_FILE_ID;
+		}
 	}
 }
 
@@ -164,8 +233,8 @@ long_map_t* GetPopularBlockList(long *top_k)
 
 block_t* GetBlock(long id)
 {
-	if (id > DATA_BLOCK_NUM)
+	if (id > BLOCK_MAP.size())
 		return NULL;
 
-	return &BLOCK_ARR[id];
+	return BLOCK_MAP[id];
 }

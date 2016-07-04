@@ -4,11 +4,12 @@ bool EV_NEW_JOB = false;
 long REMAIN_MAP_TASKS;
 long MAX_JOB_ID;
 double CHANGE_T, CUR_INT, NEXT_INT, CHG_PERIOD;
-std::map<long, job_t*> JOB_MAP;
+std::unordered_map<long, job_t*> JOB_MAP;
 std::list<job_t*> MAP_QUEUE;
 
 extern bool CSIM_END;
 extern std::vector<file_t*> FILE_VEC[MOD_NUM];
+extern std::unordered_map<long, file_t*> FILE_MAP;
 extern double SETUP_DATA_SKEW;
 extern double SETUP_LOAD_SCENARIO[5];
 extern long REPORT_MAP_TASKS;
@@ -83,10 +84,7 @@ void workload(void)
 				job->map_cascade.clear();
 
 				while (job->map_total < maps) {
-					n = rand_zipf();
-					max = FILE_VEC[n].size() - 1;
-					i = uniform_int(0, max);
-					file = FILE_VEC[n].at(i);
+					file = FILE_MAP[file_id];
 
 					for (iter = file->blocks.begin(); iter != file->blocks.end() && job->map_total < maps; ++iter) {
 						block_t *b = *iter;

@@ -2,7 +2,7 @@
 
 node_map_t HEARTBEAT;
 
-extern std::map<long, job_t*> JOB_MAP;
+extern std::unordered_map<long, job_t*> JOB_MAP;
 extern std::map<long, std::list<std::pair<double, long>>> FILE_HISTORY;
 extern node_t NODES[NODE_NUM];
 extern slot_t MAPPER[MAP_SLOTS_MAX];
@@ -10,7 +10,7 @@ extern long REMAIN_MAP_TASKS, REPORT_BUDGET_HIT;
 extern mailbox *M_MAPPER[MAP_SLOTS_MAX];
 extern bool CSIM_END;
 extern std::list<job_t*> MAP_QUEUE;
-extern std::map<long, file_t*> FILE_MAP;
+extern std::unordered_map<long, file_t*> FILE_MAP;
 extern long REPORT_NODE_STATE_COUNT[STATE_LENGTH];
 extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
 extern table *T_LOCALITY[LOCAL_LENGTH];
