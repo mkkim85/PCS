@@ -394,6 +394,9 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 						++nit;
 					}
 					if (same_rack == false || check_cnt > iterNum) {
+						if (ENABLE_COMP == true && nit != b->local_node.end()) {
+							node_cpu(nit->second->id, (double)COMP_T);
+						}
 						check_cnt = 0;
 						break;
 					}

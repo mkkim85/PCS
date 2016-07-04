@@ -42,7 +42,7 @@ void init_rack(void);
 void turnon_rack(long id);
 void turnoff_rack(long id);
 double switch_rack(long from, long to);
-double switch_rack(long from, long to, long n);
+double switch_rack(long from, long to, double n);
 
 // report.cpp
 void sim_report(void);

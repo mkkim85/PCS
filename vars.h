@@ -1,7 +1,7 @@
 // simulation parameters
 //#define REPLICA_LIMIT			INT_MAX		//INT_MAX
 //#define RAND_LAYOUT				false
-#define FB_WORKLOAD				true
+#define FB_WORKLOAD				false
 #define FB_PATH					"files/workload.txt"
 #define FB_DATA_PATH			"files/data.txt"
 #define FB_LOAD_RATIO			0.3
@@ -39,8 +39,8 @@
 #define NODE_NUM_IN_RACK		(int)(NODE_NUM / RACK_NUM)
 #define SWTICH_NUM				(int)(NODE_NUM_IN_RACK)
 #define RACK_POWER				5940.0		// 5.94 kW
-#define SWITCH_DELAY			0.1
-#define SWITCH_SPEED			0.05		// 0.05 s/block, 10 Gbps, 1.25 GB/s
+#define SWITCH_DELAY			0.1		// 10 Gbps, 1% overhead
+#define SWITCH_SPEED			0.5		// 0.05 s/block, 10 Gbps, 1.25 GB/s
 
 // setup
 #define MAX_PROCESSES			(NODE_NUM + MAP_SLOTS_MAX + 7)
@@ -61,3 +61,15 @@
 #define PARTITION_FACTOR		4
 #define PARTITION_NODE_NUM		(NODE_NUM_IN_RACK / PARTITION_FACTOR)
 #define MOD_NUM					(CS_NODE_NUM / PARTITION_NODE_NUM)
+
+// gzip
+#define COMP_T					(64.0 / (144.0 / 8.0))	// 144 Mbps
+#define DECOMP_T				(64.0 / (413.0 / 8.0))	// 413 Mbps
+#define COMP_FACTOR				uniform_int(12, 13)
+
+// PPMVC
+//#define COMP_T					(64.0 / (30.2 / 8.0))	// 30.2 Mbps
+//#define DECOMP_T				(64.0 / (31.4 / 8.0))	// 31.4 Mbps
+//#define COMP_FACTOR				uniform_int(26, 27)
+
+#define ENABLE_COMP				false

@@ -114,7 +114,14 @@ void node(long id)
 					itend = MANAGER_BUDGET_MAP[id].end();
 
 				while (it != itend) {
-					switch_rack(it->first, parent->id, it->second.size());
+					if (ENABLE_COMP == true) {
+						double size = it->second.size() / (double)COMP_FACTOR;
+						switch_rack(it->first, parent->id, size);
+						node_cpu(id, (double)DECOMP_T * size);	// de-compress
+					}
+					else {
+						switch_rack(it->first, parent->id, it->second.size());
+					}
 					// insert blocks in budget
 					while (!it->second.empty()) {
 						block_t *b = GetBlock(it->second.front());

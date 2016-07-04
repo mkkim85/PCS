@@ -98,7 +98,7 @@ double switch_rack(long from, long to)
 	return clock - begin;
 }
 
-double  switch_rack(long from, long to, long n)
+double  switch_rack(long from, long to, double n)
 {	// For budget data transfer
 	double begin = clock;
 	double t = SWITCH_SPEED * n;
