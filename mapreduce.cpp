@@ -117,14 +117,14 @@ void mapper(long id)
 		long psiz = file->acc.size();
 		++file->acc[job->id];
 		long csiz = file->acc.size();
-		if ((SETUP_MODE_TYPE == MODE_IPACS || SETUP_MODE_TYPE == MODE_PCS)
+		if ((SETUP_MODE_TYPE == MODE_IPACS || SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC)
 			&& csiz > 1 && psiz != csiz) {
 			FILE_HISTORY[file->id].push_back(std::pair<double, long>(clock, csiz));
 		}
 		++parent->mapper.used;
 		MAPPER[id].used = true;
 
-		if (SETUP_MODE_TYPE == MODE_PCS) {
+		if (SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) {
 			if (BUDGET_MAP.find(block->id) != BUDGET_MAP.end()) {
 				if (BUDGET_MAP[block->id].find(node) != BUDGET_MAP[block->id].end()) {
 					++REPORT_BUDGET_HIT;
@@ -158,12 +158,9 @@ void mapper(long id)
 				node_disk(local_node, 1);
 				disk_t = clock - bdisk;
 			}
-
 			mem_caching(local_node, block->id);
-
 			net_t = switch_rack(local_rack, rack);
 		}
-
 		mem_caching(node, block->id);
 
 		bcpu = clock;

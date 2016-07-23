@@ -9,9 +9,6 @@ block_t* GetBlock(long id);
 // init.cpp
 void init(void);
 
-// log.cpp
-void logging(char str[]);
-
 // main.cpp
 // extern "C" FILE * __cdecl __iob_func(void)
 // extern "C" void sim(void)

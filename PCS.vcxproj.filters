@@ -36,9 +36,6 @@
     <ClCompile Include="init.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="log.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="workload.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>

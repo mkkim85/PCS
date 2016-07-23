@@ -29,7 +29,7 @@ void init(void)
 
 	sprintf(str, "mSwitch");
 	F_MASTER_SWITCH = new facility(str);
-	F_MASTER_SWITCH->set_servicefunc(inf_srv);
+	//F_MASTER_SWITCH->set_servicefunc(inf_srv);
 
 	extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
 
@@ -47,9 +47,4 @@ void init(void)
 
 	T_CACHE_HIT = new table("cache hit");
 	T_CACHE_MISS = new table("cache miss");
-
-	if (LOGGING) {
-		FILE *f = fopen("PCS-log.txt", "w");
-		fclose(f);
-	}
 }

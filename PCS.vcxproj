@@ -74,7 +74,6 @@
   <ItemGroup>
     <ClCompile Include="file.cpp" />
     <ClCompile Include="init.cpp" />
-    <ClCompile Include="log.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="manager.cpp" />
     <ClCompile Include="mapreduce.cpp" />

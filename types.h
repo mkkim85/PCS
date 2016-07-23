@@ -11,7 +11,7 @@
 typedef enum { STATE_ACTIVATE, STATE_DEACTIVATE, STATE_STANDBY, STATE_ACTIVE, STATE_LENGTH } StateTypes;
 typedef enum { O_CPU, O_MEMORY, O_DISK, O_NETWORK, O_QDELAY, O_LENGTH } OverheadTypes;
 typedef enum { LOCAL_NODE, LOCAL_RACK, LOCAL_REMOTE, LOCAL_LENGTH } LocalTypes;
-typedef enum { MODE_BASELINE, MODE_SIERRA, MODE_IPACS, MODE_PCS, MODE_LENGTH } ModeTypes;
+typedef enum { MODE_BASELINE, MODE_SIERRA, MODE_IPACS, MODE_PCS, MODE_PCSC, MODE_LENGTH } ModeTypes;
 typedef enum { FAIR_SCHEDULER, DELAY_SCHEDULER, SCHEDULER_LENGTH } SchedulerTypes;
 
 typedef std::map<long, long> long_map_t;

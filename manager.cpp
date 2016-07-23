@@ -86,7 +86,8 @@ void state_manager(void)
 			}
 		}
 
-		if (SETUP_MODE_TYPE == MODE_PCS && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0 && stable == true) {
+		if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC)
+			&& clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0 && stable == true) {
 			m = 0;
 			for (std::list<long>::iterator it = INCOMPLETE_MAP_TASKS_Q.begin(); it != INCOMPLETE_MAP_TASKS_Q.end(); ++it) {
 				if (m < *it)
@@ -298,7 +299,7 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 	UPSET.clear();
 	DOWNSET.clear();
 
-	if (SETUP_MODE_TYPE == MODE_PCS && !bag->empty()) { // TODO: using bag
+	if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) && !bag->empty()) { // TODO: using bag
 		long listSize = MANAGER_BAG_SIZE;
 		long sBudgetSize = MANAGER_BUDGET_SIZE;
 
@@ -394,7 +395,7 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 						++nit;
 					}
 					if (same_rack == false || check_cnt > iterNum) {
-						if (ENABLE_COMP == true && nit != b->local_node.end()) {
+						if (SETUP_MODE_TYPE == MODE_PCSC && nit != b->local_node.end()) {
 							node_cpu(nit->second->id, (double)COMP_T);
 						}
 						check_cnt = 0;

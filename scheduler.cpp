@@ -82,8 +82,8 @@ msg_t * scheduler(long node)
 			// <ref> Zaharia, Matei, et al. "Delay scheduling: a simple technique for achieving locality and fairness in cluster scheduling." Proceedings of the 5th European conference on Computer systems. ACM, 2010. </ref>
 			double gamma = 0.95;
 			long N = job->map_splits.size();
-			long M = ACTIVE_NODE_SET.size();
-			double R = (double)M / CS_NODE_NUM;
+			long M = 1200;		// ACTIVE_NODE_SET.size();
+			double R = 3.0;		// (double)M / CS_NODE_NUM;
 			double D = (double)-(M / R) * log(((1 - gamma) * N) / (1 + (1 - gamma) * N));
 			if (job->skipcount >= (long)ceil(D / 2) && msg->task.locality == LOCAL_RACK) {
 				return msg;

@@ -109,12 +109,13 @@ void node(long id)
 
 		if (r->power.power == true && my->state == STATE_STANDBY) {
 			// Copy replications in budget
-			if (SETUP_MODE_TYPE == MODE_PCS && MANAGER_BUDGET_MAP.find(id) != MANAGER_BUDGET_MAP.end()) {
+			if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) 
+				&& MANAGER_BUDGET_MAP.find(id) != MANAGER_BUDGET_MAP.end()) {
 				std::map<long, std::list<long>>::iterator it = MANAGER_BUDGET_MAP[id].begin(),
 					itend = MANAGER_BUDGET_MAP[id].end();
 
 				while (it != itend) {
-					if (ENABLE_COMP == true) {
+					if (SETUP_MODE_TYPE == MODE_PCSC) {
 						double size = it->second.size() / (double)COMP_FACTOR;
 						switch_rack(it->first, parent->id, size);
 						node_cpu(id, (double)DECOMP_T * size);	// de-compress
@@ -176,7 +177,8 @@ void node(long id)
 			}
 
 			MEMORY[id].clear();
-			if (SETUP_MODE_TYPE == MODE_PCS && !my->space.budget.blocks.empty()) {	// clear budget
+			if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC)
+				&& !my->space.budget.blocks.empty()) {	// clear budget
 				std::map<long, void*>::iterator it = my->space.budget.blocks.begin(),
 					itend = my->space.budget.blocks.end();
 				while (it != itend) {
@@ -230,21 +232,11 @@ bool cache_hit(long nid, long bid)
 	std::list<long> *mem = &MEMORY[nid];
 
 	if (find(mem->begin(), mem->end(), bid) == mem->end()) {
-		if (LOGGING) {
-			char log[BUFSIZ];
-			sprintf(log, "%ld	<cache_hit>	node: %ld, b: %ld hit failed\n", (long)clock, nid, bid);
-			logging(log);
-		}
 		T_CACHE_MISS->record(1.0);
 		return false;
 	}
-
-	if (LOGGING) {
-		char log[BUFSIZ];
-		sprintf(log, "%ld	<cache_hit>	node: %ld, b: %ld hit success\n", (long)clock, nid, bid);
-		logging(log);
-	}
 	T_CACHE_HIT->record(1.0);
+	
 	return true;
 }
 
@@ -258,40 +250,18 @@ void mem_caching(long nid, long bid)
 
 		if (iter != mem->end()) {
 			mem->remove(bid);
-			if (LOGGING) {
-				char log[BUFSIZ];
-				sprintf(log, "%ld	<mem_caching>	node: %ld, b: %ld replaced\n", (long)clock, nid, bid);
-				logging(log);
-			}
 		}
 		else {
-			if (LOGGING) {
-				char log[BUFSIZ];
-				sprintf(log, "%ld	<mem_caching>	node: %ld, b: %ld removed\n", (long)clock, nid, mem->back());
-				logging(log);
-			}
 			mem->pop_back();
 		}
 	}
 	MEMORY[nid].push_front(bid);
-
-	if (LOGGING) {
-		char log[BUFSIZ];
-		sprintf(log, "%ld	<mem_caching>	node: %ld, b: %ld cached\n", (long)clock, nid, bid);
-		logging(log);
-	}
 }
 
 void node_cpu(long id, double t)
 {
 	double btime = clock;
 	FM_CPU[id]->use(t);
-
-	if (LOGGING) {
-		char log[BUFSIZ];
-		sprintf(log, "%ld	<node_cpu>	node: %ld, %lf sec\n", (long)clock, id, (double)clock - btime);
-		logging(log);
-	}
 }
 
 void node_mem(long id, long n)
@@ -299,12 +269,6 @@ void node_mem(long id, long n)
 	double btime = clock;
 	double t = MEMORY_SPEED * n;
 	F_MEMORY[id]->use(t);
-
-	if (LOGGING) {
-		char log[BUFSIZ];
-		sprintf(log, "%ld	<node_mem>	node: %ld, %ld blk: %lf sec\n", (long)clock, id, n, (double)clock - btime);
-		logging(log);
-	}
 }
 
 void node_disk(long id, long n)
@@ -312,10 +276,4 @@ void node_disk(long id, long n)
 	double btime = clock;
 	double t = DISK_SPEED * n;
 	FM_DISK[id]->use(t);
-
-	if (LOGGING) {
-		char log[BUFSIZ];
-		sprintf(log, "%ld	<node_disk>	node: %ld, %ld blk: %lf sec\n", (long)clock, id, n, (double)clock - btime);
-		logging(log);
-	}
 }
