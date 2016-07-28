@@ -19,7 +19,6 @@ long_map_t* FindSierra(bool cs[], long top_k, long req_m);
 long_map_t* FindiPACS(bool cs[], long_map_t *bag, long top_k, long req_m);
 long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m);
 void ActivateNodes(bool cs[], long_map_t *bag);
-bool sort_rank(const rack_t *x, const rack_t *y);
 
 // mapreduce.cpp
 void job_tracker(void);
@@ -45,7 +44,6 @@ double switch_rack(long from, long to, double n);
 void sim_report(void);
 
 // scheduler.cpp
-bool sort_queue(const job_t *x, const job_t *y);
 msg_t* scheduler(long node);
 
 // setup.cpp

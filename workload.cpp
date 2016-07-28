@@ -3,12 +3,12 @@
 long REMAIN_MAP_TASKS;
 long MAX_JOB_ID;
 double CHANGE_T, CUR_INT, NEXT_INT, CHG_PERIOD;
-std::unordered_map<long, job_t*> JOB_MAP;
-std::list<job_t*> MAP_QUEUE;
+CAtlMap<long, job_t*> JOB_MAP;
+CRBMap<long, CAtlList<long>*> P_QUEUE;
 
 extern bool CSIM_END;
-extern std::vector<file_t*> FILE_VEC[MOD_FACTOR];
-extern std::unordered_map<long, file_t*> FILE_MAP;
+extern CAtlArray<file_t*> FILE_VEC[MOD_FACTOR];
+extern CAtlMap<long, file_t*> FILE_MAP;
 extern double SETUP_DATA_SKEW;
 extern double SETUP_LOAD_SCENARIO[5];
 extern long REPORT_MAP_TASKS;
@@ -57,7 +57,6 @@ void workload(void)
 		double sec, gen_t, hold_t;
 		file_t *file;
 		job_t *job;
-		std::vector<block_t*>::iterator iter;
 		FILE *f;
 
 		if ((f = fopen(FB_PATH, "r")) == NULL)
@@ -83,22 +82,22 @@ void workload(void)
 				job->map_total = 0;
 				job->skipcount = 0;	// for delay scheduler
 				job->run_total = 0;
-				job->map_splits.clear();
-				job->map_cascade.clear();
+				job->map_splits.RemoveAll();
+				job->map_cascade.RemoveAll();
 
 				while (job->map_total < maps) {
 					file = FILE_MAP[file_id];
 
-					for (iter = file->blocks.begin(); iter != file->blocks.end() && job->map_total < maps; ++iter) {
-						block_t *b = *iter;
-						node_map_t::iterator it = b->local_node.begin(), itend = b->local_node.end();
-						while (it != itend) {
-							long tn = it->first;
+					for (long i = 0; i < file->blocks.GetCount(); i++) {
+						block_t *b = file->blocks[i];
+						POSITION pos = b->local_node.GetHeadPosition();
+						while (pos != NULL) {
+							long tn = b->local_node.GetKeyAt(pos);
 							long tr = GET_RACK_FROM_NODE(tn);
 							job->map_splits[tr][tn][b->id] = job->map_splits[tr][tn][b->id] + 1;
 							job->map_cascade[b->id][tn] = tr;
 
-							++it;
+							b->local_node.GetNext(pos);
 						}
 						++job->map_total;
 					}
@@ -107,7 +106,9 @@ void workload(void)
 				REMAIN_MAP_TASKS += maps;
 				REPORT_MAP_TASKS += maps;
 				JOB_MAP[job->id] = job;
-				MAP_QUEUE.push_back(job);
+				if (P_QUEUE.Lookup(0) == NULL)
+					P_QUEUE.SetAt(0, new CAtlList<long>);
+				P_QUEUE.Lookup(0)->m_value->AddTail(job->id);
 			}
 		}
 		fclose(f);
@@ -119,7 +120,6 @@ void workload(void)
 		double u, std, t;
 		file_t *file;
 		job_t *job;
-		std::vector<block_t*>::iterator iter;
 
 		create("workload");
 		while (!CSIM_END) {
@@ -134,7 +134,7 @@ void workload(void)
 				u = CUR_INT;
 			}
 			count = 0;
-			max_tasks = MAP_SLOTS_MAX * u;
+			max_tasks = 9600 * u;
 
 			while (count < max_tasks) {
 				job = new job_t;
@@ -146,26 +146,30 @@ void workload(void)
 				job->map_total = 0;
 				job->skipcount = 0;	// for delay scheduler
 				job->run_total = 0;
-				job->map_splits.clear();
-				job->map_cascade.clear();
+				job->map_splits.RemoveAll();
+				job->map_cascade.RemoveAll();
 
 				while (job->map_total < JOB_MAP_TASK_NUM) {
 					n = rand_zipf();
-					//file = FILE_MAP[n];
-					max = FILE_VEC[n].size() - 1;
+					max = FILE_VEC[n].GetCount() - 1;
 					i = uniform_int(0, max);
-					file = FILE_VEC[n].at(i);
+					file = FILE_VEC[n][i];
 
-					for (iter = file->blocks.begin(); iter != file->blocks.end() && job->map_total < JOB_MAP_TASK_NUM; ++iter) {
-						block_t *b = *iter;
-						node_map_t::iterator it = b->local_node.begin(), itend = b->local_node.end();
-						while (it != itend) {
-							long tn = it->first;
+					for (long i = 0; i < file->blocks.GetCount() && job->map_total < JOB_MAP_TASK_NUM; i++) {
+						block_t *b = file->blocks[i];
+						POSITION pos = b->local_node.GetHeadPosition();
+						while (pos != NULL) {
+							long tn = b->local_node.GetKeyAt(pos);
 							long tr = GET_RACK_FROM_NODE(tn);
-							job->map_splits[tr][tn][b->id] = job->map_splits[tr][tn][b->id] + 1;
+							if (job->map_splits[tr][tn].Lookup(b->id) == NULL) {
+								job->map_splits[tr][tn][b->id] = 1;
+							} 
+							else {
+								job->map_splits[tr][tn][b->id]++;
+							}
 							job->map_cascade[b->id][tn] = tr;
 
-							++it;
+							b->local_node.GetNext(pos);
 						}
 						++job->map_total;
 					}
@@ -174,7 +178,10 @@ void workload(void)
 				REMAIN_MAP_TASKS += JOB_MAP_TASK_NUM;
 				REPORT_MAP_TASKS += JOB_MAP_TASK_NUM;
 				JOB_MAP[job->id] = job;
-				MAP_QUEUE.push_back(job);
+				//MAP_QUEUE.AddTail(job);
+				if (P_QUEUE.Lookup(0) == NULL)
+					P_QUEUE.SetAt(0, new CAtlList<long>);
+				P_QUEUE.Lookup(0)->m_value->AddTail(job->id);
 			}
 			hold(150.0);
 		}

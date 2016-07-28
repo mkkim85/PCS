@@ -2,15 +2,15 @@
 
 node_map_t HEARTBEAT;
 
-extern std::unordered_map<long, job_t*> JOB_MAP;
-extern std::map<long, std::list<std::pair<double, long>>> FILE_HISTORY;
+extern CAtlMap<long, job_t*> JOB_MAP;
+extern CAtlMap<long, CAtlList<std::pair<double, long>>> FILE_HISTORY;
 extern node_t NODES[NODE_NUM];
 extern slot_t MAPPER[MAP_SLOTS_MAX];
 extern long REMAIN_MAP_TASKS, REPORT_BUDGET_HIT;
 extern mailbox *M_MAPPER[MAP_SLOTS_MAX];
 extern bool CSIM_END;
-extern std::list<job_t*> MAP_QUEUE;
-extern std::unordered_map<long, file_t*> FILE_MAP;
+//extern CAtlList<job_t*> MAP_QUEUE;
+extern CAtlMap<long, file_t*> FILE_MAP;
 extern long REPORT_NODE_STATE_COUNT[STATE_LENGTH];
 extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
 extern table *T_LOCALITY[LOCAL_LENGTH];
@@ -21,39 +21,39 @@ extern double REPORT_RESP_T_TOTAL, REPORT_Q_DELAY_T_TOTAL;
 extern long REPORT_RESP_T_COUNT, REPORT_Q_DELAY_T_COUNT;
 extern long REPORT_LOCALITY[LOCAL_LENGTH];
 extern std::pair<double, long> REPORT_TASK_T, REPORT_CPU_T, REPORT_MEM_T, REPORT_DISK_T, REPORT_NETWORK_T, REPORT_TASK_Q_T;
-extern std::map<long, std::map<long, bool>> BUDGET_MAP;
+extern CAtlMap<long, CAtlMap<long, bool>> BUDGET_MAP;
+extern CRBMap<long, CAtlList<long>*> P_QUEUE;
 
 void job_tracker(void)
 {
 	msg_t *msg;
 	long i;
 	node_t *node;
+	CAtlArray<node_t*> heartbeat;
 
 	create("job_tracker");
 	while (!CSIM_END) {
 		//	node_map_t heartbeat, reuse;
-		node_map_t heartbeat;
+		heartbeat.RemoveAll();
 
-		if (MAP_QUEUE.empty() == false && HEARTBEAT.empty() == false) {
-			heartbeat = HEARTBEAT;
-			for (node_map_t::iterator it = heartbeat.begin(); it != heartbeat.end(); NULL) {
-				if (it->second->mapper.used == it->second->mapper.capacity)
-					heartbeat.erase(it++);
-				else ++it;
+		if (P_QUEUE.IsEmpty() == false && HEARTBEAT.IsEmpty() == false) {
+			POSITION pos = HEARTBEAT.GetHeadPosition();
+			while (pos != NULL) {
+				node_map_t::CPair *pair = HEARTBEAT.GetAt(pos);
+				if (pair->m_value->mapper.used != pair->m_value->mapper.capacity)
+					heartbeat.Add(pair->m_value);
+				HEARTBEAT.GetNext(pos);
 			}
 		}
 
-		while (heartbeat.empty() == false && MAP_QUEUE.empty() == false) {
-			i = uniform_int(0, heartbeat.size() - 1);
-			node_map_t::iterator it = heartbeat.begin();
-			std::advance(it, uniform_int(0, heartbeat.size() - 1));
-			node = it->second;
-			heartbeat.erase(node->id);
+		while (heartbeat.IsEmpty() == false && P_QUEUE.IsEmpty() == false) {
+			i = uniform_int(0, heartbeat.GetCount() - 1);
+			node = heartbeat[i];
+			heartbeat.RemoveAt(i);
 
 			if ((msg = scheduler(node->id)) == NULL) {
 				continue;
 			}
-
 			M_MAPPER[msg->task.id]->synchronous_send((long)msg);
 		}
 
@@ -84,8 +84,20 @@ void mapper(long id)
 		btask = clock;
 		job = r->task.job;
 		locality = r->task.locality;
+		
+		P_QUEUE.Lookup(job->running)->m_value->RemoveAt(P_QUEUE.Lookup(job->running)->m_value->Find(job->id));
+		if (P_QUEUE.Lookup(job->running)->m_value->IsEmpty() == true) {
+			delete P_QUEUE.Lookup(job->running)->m_value;
+			P_QUEUE.RemoveKey(job->running);
+		}
 		++job->running;
 		++job->run_total;
+		if (job->run_total < job->map_total) {
+			if (P_QUEUE.Lookup(job->running) == NULL) {
+				P_QUEUE.SetAt(job->running, new CAtlList<long>);
+			}
+			P_QUEUE.Lookup(job->running)->m_value->AddTail(job->id);
+		}
 
 		q_t = abs(clock - job->time.begin);
 		job->time.qtotal += q_t;
@@ -93,43 +105,42 @@ void mapper(long id)
 		block = r->task.block;
 
 		// erase job split using cascade
-		for (long_map_t::iterator it = job->map_cascade[block->id].begin();
-		it != job->map_cascade[block->id].end(); ++it) {
-			long tn = it->first;
-			long tr = it->second;
+		POSITION tpos = job->map_cascade[block->id].GetStartPosition();
+		while (tpos != NULL) {
+			long_map_t::CPair *pair = job->map_cascade[block->id].GetAt(tpos);
+			long tn = pair->m_key;
+			long tr = pair->m_value;
 
 			job->map_splits[tr][tn][block->id] = job->map_splits[tr][tn][block->id] - 1;
 			if (job->map_splits[tr][tn][block->id] <= 0) {
-				job->map_splits[tr][tn].erase(block->id);
-				if (job->map_splits[tr][tn].empty() == true) {
-					job->map_splits[tr].erase(tn);
-					if (job->map_splits[tr].empty() == true) {
-						job->map_splits.erase(tr);
+				job->map_splits[tr][tn].RemoveKey(block->id);
+				if (job->map_splits[tr][tn].IsEmpty() == true) {
+					job->map_splits[tr].RemoveKey(tn);
+					if (job->map_splits[tr].IsEmpty() == true) {
+						job->map_splits.RemoveKey(tr);
 					}
 				}
 			}
+			
+			job->map_cascade[block->id].GetNext(tpos);
 		}
 
-		if (job->map_splits.empty() == true) {
-			MAP_QUEUE.remove(job);
-		}
 		file = FILE_MAP[block->file_id];
-		long psiz = file->acc.size();
+		long psiz = file->acc.GetCount();
 		++file->acc[job->id];
-		long csiz = file->acc.size();
+		long csiz = file->acc.GetCount();
 		if ((SETUP_MODE_TYPE == MODE_IPACS || SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC)
 			&& csiz > 1 && psiz != csiz) {
-			FILE_HISTORY[file->id].push_back(std::pair<double, long>(clock, csiz));
+			FILE_HISTORY[file->id].AddTail(std::pair<double, long>(clock, csiz));
 		}
 		++parent->mapper.used;
 		MAPPER[id].used = true;
 
 		if (SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) {
-			if (BUDGET_MAP.find(block->id) != BUDGET_MAP.end()) {
-				if (BUDGET_MAP[block->id].find(node) != BUDGET_MAP[block->id].end()) {
+			if (BUDGET_MAP.Lookup(block->id) != NULL) {
+				if (BUDGET_MAP[block->id].Lookup(node) != NULL) {
 					++REPORT_BUDGET_HIT;
 				}
-
 			}
 		}
 
@@ -171,12 +182,24 @@ void mapper(long id)
 		REPORT_CPU_T.second++;
 
 		if (--file->acc[job->id] <= 0) {
-			file->acc.erase(job->id);
+			file->acc.RemoveKey(job->id);
 		}
 		MAPPER[id].used = false;
 		--parent->mapper.used;
 
-		if (--job->running == 0 && job->map_splits.empty() == true) {
+		if (job->map_splits.IsEmpty() == false) {
+			P_QUEUE.Lookup(job->running)->m_value->RemoveAt(P_QUEUE.Lookup(job->running)->m_value->Find(job->id));
+			if (P_QUEUE.Lookup(job->running)->m_value->IsEmpty() == true) {
+				delete P_QUEUE.Lookup(job->running)->m_value;
+				P_QUEUE.RemoveKey(job->running);
+			}
+			if (P_QUEUE.Lookup(job->running - 1) == NULL) {
+				P_QUEUE.SetAt(job->running - 1, new CAtlList<long>);
+			}
+			P_QUEUE.Lookup(job->running - 1)->m_value->AddTail(job->id);
+		}
+
+		if (--job->running == 0 && job->map_splits.IsEmpty() == true) {
 			// complete job
 			job->time.end = clock;
 			double turnaround_t = abs(job->time.end - job->time.begin);
@@ -186,7 +209,7 @@ void mapper(long id)
 			++REPORT_RESP_T_COUNT;
 			REPORT_Q_DELAY_T_TOTAL += job->time.qtotal;
 			++REPORT_Q_DELAY_T_COUNT;
-			JOB_MAP.erase(job->id);
+			JOB_MAP.RemoveKey(job->id);
 			delete job;
 		}
 

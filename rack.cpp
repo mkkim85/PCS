@@ -20,12 +20,12 @@ void init_rack(void)
 		rack->rank = 0;
 		if (SETUP_MODE_TYPE == MODE_BASELINE || i < CS_RACK_NUM) {
 			rack->state = STATE_ACTIVE;
-			ACTIVE_RACK_SET[i] = rack;
+			ACTIVE_RACK_SET.SetAt(i, rack);//ACTIVE_RACK_SET[i] = rack;
 		}
 		else {
 			rack->state = STATE_STANDBY;
-			STANDBY_RACK_SET[i] = rack;
-			NPG_SET[i] = rack;
+			STANDBY_RACK_SET.SetAt(i, rack);//STANDBY_RACK_SET[i] = rack;
+			NPG_SET.SetAt(i, rack); //NPG_SET[i] = rack;
 		}
 
 		sprintf(str, "rSwitch%ld", i);
@@ -46,9 +46,9 @@ void turnon_rack(long id)
 	--REPORT_RACK_STATE_COUNT[rack->state];
 	rack->state = STATE_ACTIVE;
 	++REPORT_RACK_STATE_COUNT[rack->state];
-	STANDBY_RACK_SET.erase(id);
-	ACTIVE_RACK_SET[id] = rack;
-	ACTIVE_RACK_NPG_SET[id] = rack;
+	STANDBY_RACK_SET.RemoveKey(id);
+	ACTIVE_RACK_SET.SetAt(id, rack); //ACTIVE_RACK_SET[id] = rack;
+	ACTIVE_RACK_NPG_SET.SetAt(id, rack); //ACTIVE_RACK_NPG_SET[id] = rack;
 }
 
 void turnoff_rack(long id)
@@ -62,9 +62,9 @@ void turnoff_rack(long id)
 	--REPORT_RACK_STATE_COUNT[rack->state];
 	rack->state = STATE_STANDBY;
 	++REPORT_RACK_STATE_COUNT[rack->state];
-	ACTIVE_RACK_SET.erase(id);
-	STANDBY_RACK_SET[id] = rack;
-	ACTIVE_RACK_NPG_SET.erase(id);
+	ACTIVE_RACK_SET.RemoveKey(id);
+	STANDBY_RACK_SET.SetAt(id, rack);//STANDBY_RACK_SET[id] = rack;
+	ACTIVE_RACK_NPG_SET.RemoveKey(id);
 }
 
 double switch_rack(long from, long to)

@@ -1,10 +1,6 @@
 #include <stdio.h>
-#include <vector>
-#include <list>
-#include <map>
-#include <unordered_map>
-#include <queue>
 #include <algorithm>
+#include <atlcoll.h>
 #include <sys/stat.h>
 #include "cpp.h"
 
@@ -14,7 +10,7 @@ typedef enum { LOCAL_NODE, LOCAL_RACK, LOCAL_REMOTE, LOCAL_LENGTH } LocalTypes;
 typedef enum { MODE_BASELINE, MODE_SIERRA, MODE_IPACS, MODE_PCS, MODE_PCSC, MODE_LENGTH } ModeTypes;
 typedef enum { FAIR_SCHEDULER, DELAY_SCHEDULER, SCHEDULER_LENGTH } SchedulerTypes;
 
-typedef std::map<long, long> long_map_t;
+typedef CAtlMap<long, long> long_map_t;
 
 struct slot_t
 {
@@ -29,12 +25,12 @@ struct storage_t
 	struct {
 		long capacity;
 		long used;
-		std::map<long, void*> blocks;
+		CAtlMap<long, void*> blocks;
 	} disk;
 	struct {
 		long capacity;
 		long used;
-		std::map<long, void*> blocks;
+		CAtlMap<long, void*> blocks;
 	} budget;
 };
 
@@ -50,7 +46,7 @@ struct node_t
 	storage_t space;
 };
 
-typedef std::map<long, node_t*> node_map_t;
+typedef CRBMap<long, node_t*> node_map_t;
 
 struct rack_t
 {
@@ -59,24 +55,24 @@ struct rack_t
 	StateTypes state;
 	node_map_t active_node_set;
 	node_map_t standby_node_set;
-	std::map<long, long> blocks;
+	CAtlMap<long, long> blocks;
 };
 
-typedef std::map<long, rack_t*> rack_map_t;
+typedef CRBMap<long, rack_t*> rack_map_t;
 
 struct block_t
 {
 	long id;
 	long file_id;
 	node_map_t local_node;
-	long_map_t local_rack;
+	CRBMap<long, long> local_rack;
 };
 
 struct file_t
 {
 	long id;
 	long size;
-	std::vector<block_t*> blocks;
+	CAtlArray<block_t*> blocks;
 	long_map_t acc;
 };
 
@@ -88,8 +84,8 @@ struct job_t
 	long run_total;
 	long map_total;
 	long skipcount;
-	std::map<long, std::map<long, long_map_t>> map_splits;
-	std::map<long, long_map_t> map_cascade;
+	CAtlMap<long, CAtlMap<long, long_map_t>> map_splits;
+	CAtlMap<long, long_map_t> map_cascade;
 	struct {
 		double begin;
 		double end;

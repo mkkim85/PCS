@@ -4,8 +4,8 @@ node_t NODES[NODE_NUM];
 node_map_t ACTIVE_NODE_SET, STANDBY_NODE_SET;
 slot_t MAPPER[MAP_SLOTS_MAX];
 long MAX_MAPPER_ID;
-std::list<long> MEMORY[NODE_NUM];
-std::map<long, std::map<long, bool>> BUDGET_MAP;
+CAtlList<long> MEMORY[NODE_NUM];
+CAtlMap<long, CAtlMap<long, bool>> BUDGET_MAP;
 
 extern rack_t RACKS[RACK_NUM];
 extern double SETUP_BUDGET_RATIO;
@@ -18,11 +18,12 @@ extern long REPORT_NODE_STATE_COUNT[STATE_LENGTH];
 extern node_map_t HEARTBEAT;
 extern bool MANAGER_CS[NODE_NUM];
 extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
-extern std::map<long, std::map<long, std::list<long>>> MANAGER_BUDGET_MAP;
+extern CAtlMap<long, CAtlMap<long, CAtlList<long>>> MANAGER_BUDGET_MAP;
+//extern CAtlMap<long, CAtlMap<long, long>> MANAGER_LOCAL_MAP;
 extern long_map_t UPSET, DOWNSET;
 extern long REPORT_BUDGET_SIZE;
 extern long SETUP_NODE_UPTIME;
-extern std::unordered_map<long, block_t*> BLOCK_MAP;
+extern CAtlMap<long, block_t*> BLOCK_MAP;
 
 void init_node(void)
 {
@@ -40,12 +41,12 @@ void init_node(void)
 		prack = &RACKS[i / NODE_NUM_IN_RACK];
 		pnode->space.capacity = DISK_SIZE;
 		pnode->space.used = 0;
-		pnode->space.budget.capacity = ceil((BLOCK_MAP.size() / CS_NODE_NUM) * SETUP_BUDGET_RATIO); 
+		pnode->space.budget.capacity = ceil((BLOCK_MAP.GetCount() / CS_NODE_NUM) * SETUP_BUDGET_RATIO); 
 		pnode->space.budget.used = 0;
 		pnode->space.disk.capacity = DISK_SIZE - pnode->space.budget.capacity;
 		pnode->space.disk.used = 0;
-		pnode->space.disk.blocks.clear();
-		pnode->space.budget.blocks.clear();
+		pnode->space.disk.blocks.RemoveAll();
+		pnode->space.budget.blocks.RemoveAll();
 
 		sprintf(str, "nMail%ld", i);
 		M_NODE[i] = new mailbox(str);
@@ -66,15 +67,15 @@ void init_node(void)
 
 		if (SETUP_MODE_TYPE == MODE_BASELINE || i < CS_NODE_NUM) {
 			pnode->state = STATE_ACTIVE;
-			prack->active_node_set[i] = pnode;
-			ACTIVE_NODE_SET[i] = pnode;
-			HEARTBEAT[i] = pnode;
+			prack->active_node_set.SetAt(i, pnode); //prack->active_node_set[i] = pnode;
+			ACTIVE_NODE_SET.SetAt(i, pnode); //ACTIVE_NODE_SET[i] = pnode;
+			HEARTBEAT.SetAt(i, pnode);//HEARTBEAT[i] = pnode;
 			MANAGER_CS[i] = true;
 		}
 		else {
 			pnode->state = STATE_STANDBY;
-			prack->standby_node_set[i] = pnode;
-			STANDBY_NODE_SET[i] = pnode;
+			prack->standby_node_set.SetAt(i, pnode);//prack->standby_node_set[i] = pnode;
+			STANDBY_NODE_SET.SetAt(i, pnode); //STANDBY_NODE_SET[i] = pnode;
 			MANAGER_CS[i] = false;
 		}
 		++REPORT_NODE_STATE_COUNT[pnode->state];
@@ -86,7 +87,7 @@ void init_node(void)
 		sprintf(str, "mem%ld", i);
 		F_MEMORY[i] = new facility(str);
 
-		MEMORY[i].clear();
+		MEMORY[i].RemoveAll();
 
 		sprintf(str, "disk%ld", i);
 		FM_DISK[i] = new facility_ms(str, DISK_NUM);
@@ -110,43 +111,66 @@ void node(long id)
 		if (r->power.power == true && my->state == STATE_STANDBY) {
 			// Copy replications in budget
 			if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) 
-				&& MANAGER_BUDGET_MAP.find(id) != MANAGER_BUDGET_MAP.end()) {
-				std::map<long, std::list<long>>::iterator it = MANAGER_BUDGET_MAP[id].begin(),
-					itend = MANAGER_BUDGET_MAP[id].end();
-
-				while (it != itend) {
+				&& MANAGER_BUDGET_MAP.Lookup(id) != NULL) {
+				POSITION pos = MANAGER_BUDGET_MAP[id].GetStartPosition();
+				
+				while (pos != NULL) {
+					CAtlMap<long, CAtlList<long>>::CPair *pair = MANAGER_BUDGET_MAP[id].GetAt(pos);
 					if (SETUP_MODE_TYPE == MODE_PCSC) {
-						double size = it->second.size() / (double)COMP_FACTOR;
-						switch_rack(it->first, parent->id, size);
+						/*if (MANAGER_LOCAL_MAP.Lookup(id) != NULL) {
+							CAtlMap<long, long> *m = &MANAGER_LOCAL_MAP[id];
+							for (POSITION pos2 = m->GetStartPosition();
+								pos2 != NULL; m->GetNext(pos2)) {
+								CAtlMap<long, long>::CPair *pa = m->GetAt(pos2);
+								node_cpu(pair->m_key, (double)COMP_T * pa->m_value);
+							}
+						}*/
+						for (POSITION pos = pair->m_value.GetHeadPosition();
+							pos != NULL; pair->m_value.GetNext(pos)) {
+							block_t *b = GetBlock(pair->m_value.GetAt(pos));
+							while (true) {
+								POSITION rp = b->local_node.GetHeadPosition();
+								long rn = uniform_int(0, b->local_node.GetCount() - 1);
+								while (rn--)
+									b->local_node.GetNext(rp);
+								node_t *pnode = b->local_node.GetAt(rp)->m_value;
+								if (pnode->state == STATE_ACTIVE) {
+									node_cpu(pnode->id, (double)COMP_T);
+									break;
+								}
+							}
+						}
+
+						double size = pair->m_value.GetCount() / (double)COMP_FACTOR;
+						switch_rack(pair->m_key, parent->id, size);
 						node_cpu(id, (double)DECOMP_T * size);	// de-compress
 					}
 					else {
-						switch_rack(it->first, parent->id, it->second.size());
+						switch_rack(pair->m_key, parent->id, pair->m_value.GetCount());
 					}
 					// insert blocks in budget
-					while (!it->second.empty()) {
-						block_t *b = GetBlock(it->second.front());
-						it->second.pop_front();
+					while (!pair->m_value.IsEmpty()) {
+						block_t *b = GetBlock(pair->m_value.RemoveHead());
 						my->space.budget.blocks[b->id] = b;
 						++my->space.budget.used;
 						++my->space.used;
-						if (parent->blocks.find(b->id) == parent->blocks.end()) {
+						if (parent->blocks.Lookup(b->id) == NULL) {
 							parent->blocks[b->id] = 1;
 						}
 						else {
 							++parent->blocks[b->id];
 						}
-						b->local_node[id] = my;
-						if (b->local_rack.find(rack) == b->local_rack.end()) {
-							b->local_rack[rack] = 1;
+						b->local_node.SetAt(id, my); //b->local_node[id] = my;
+						if (b->local_rack.Lookup(rack) == NULL) {
+							b->local_rack.SetAt(rack, 1);//b->local_rack[rack] = 1;
 						}
 						else {
-							++b->local_rack[rack];
+							b->local_rack.SetAt(rack, b->local_rack.Lookup(rack)->m_value + 1); //++b->local_rack[rack];
 						}
 						BUDGET_MAP[b->id][id] = 1;
 						++REPORT_BUDGET_SIZE;
 					}
-					++it;
+					MANAGER_BUDGET_MAP[id].GetNext(pos);
 				}
 			}
 			if (parent->state == STATE_STANDBY) {
@@ -155,49 +179,51 @@ void node(long id)
 			--REPORT_NODE_STATE_COUNT[my->state];
 			my->state = STATE_ACTIVATE;
 			++REPORT_NODE_STATE_COUNT[my->state];
-			parent->standby_node_set.erase(id);
-			STANDBY_NODE_SET.erase(id);
+			parent->standby_node_set.RemoveKey(id);
+			STANDBY_NODE_SET.RemoveKey(id);
 
 			hold(SETUP_NODE_UPTIME);
 
 			--REPORT_NODE_STATE_COUNT[my->state];
 			my->state = STATE_ACTIVE;
 			++REPORT_NODE_STATE_COUNT[my->state];
-			parent->active_node_set[id] = my;
-			ACTIVE_NODE_SET[id] = my;
-			if (UPSET.find(id) != UPSET.end())
-				UPSET.erase(id);
+			parent->active_node_set.SetAt(id, my);//parent->active_node_set[id] = my;
+			ACTIVE_NODE_SET.SetAt(id, my);//ACTIVE_NODE_SET[id] = my;
+			if (UPSET.Lookup(id) != NULL)
+				UPSET.RemoveKey(id);
 
-			HEARTBEAT[id] = my;
+			HEARTBEAT.SetAt(id, my);//HEARTBEAT[id] = my;
 		}
 		else if (r->power.power == false && my->state == STATE_ACTIVE) {
-			HEARTBEAT.erase(id);
+			HEARTBEAT.RemoveKey(id);
 			while (my->mapper.used > 0) { // wait until all work is completed 
 				hold(1.0);
 			}
 
-			MEMORY[id].clear();
+			MEMORY[id].RemoveAll();
 			if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC)
-				&& !my->space.budget.blocks.empty()) {	// clear budget
-				std::map<long, void*>::iterator it = my->space.budget.blocks.begin(),
-					itend = my->space.budget.blocks.end();
-				while (it != itend) {
-					block_t *b = (block_t*)it->second;
-					b->local_node.erase(id);
-					if (--b->local_rack[rack] == 0) {
-						b->local_rack.erase(rack);
+				&& !my->space.budget.blocks.IsEmpty()) {	// clear budget
+				POSITION pos = my->space.budget.blocks.GetStartPosition();
+				
+				while (pos != NULL) {
+					CAtlMap<long, void*>::CPair *pair = my->space.budget.blocks.GetAt(pos);
+					block_t *b = (block_t*)pair->m_value;
+					b->local_node.RemoveKey(id);
+					if (b->local_rack.Lookup(rack) != NULL && 
+						--b->local_rack.Lookup(rack)->m_value == 0) {//if (--b->local_rack[rack] == 0) {
+						b->local_rack.RemoveKey(rack);
 					}
 					if (--parent->blocks[b->id] == 0) {
-						parent->blocks.erase(b->id);
+						parent->blocks.RemoveKey(b->id);
 					}
-					BUDGET_MAP[b->id].erase(id);
-					if (BUDGET_MAP[b->id].empty()) {
-						BUDGET_MAP.erase(b->id);
+					BUDGET_MAP[b->id].RemoveKey(id);
+					if (BUDGET_MAP[b->id].IsEmpty()) {
+						BUDGET_MAP.RemoveKey(b->id);
 					}
 					--REPORT_BUDGET_SIZE;
-					++it;
+					my->space.budget.blocks.GetNext(pos);
 				}
-				my->space.budget.blocks.clear();
+				my->space.budget.blocks.RemoveAll();
 			}
 			my->space.used = my->space.used - my->space.budget.used;
 			my->space.budget.used = 0;
@@ -205,33 +231,32 @@ void node(long id)
 			--REPORT_NODE_STATE_COUNT[my->state];
 			my->state = STATE_DEACTIVATE;
 			++REPORT_NODE_STATE_COUNT[my->state];
-			parent->active_node_set.erase(id);
-			ACTIVE_NODE_SET.erase(id);
+			parent->active_node_set.RemoveKey(id);
+			ACTIVE_NODE_SET.RemoveKey(id);
 
 			hold(NODE_D_TIME);
 
 			--REPORT_NODE_STATE_COUNT[my->state];
 			my->state = STATE_STANDBY;
 			++REPORT_NODE_STATE_COUNT[my->state];
-			parent->standby_node_set[id] = my;
-			STANDBY_NODE_SET[id] = my;
-			if (DOWNSET.find(id) != DOWNSET.end())
-				DOWNSET.erase(id);
+			parent->standby_node_set.SetAt(id, my);//parent->standby_node_set[id] = my;
+			STANDBY_NODE_SET.SetAt(id, my);//STANDBY_NODE_SET[id] = my;
+			if (DOWNSET.Lookup(id) != NULL)
+				DOWNSET.RemoveKey(id);
 
-			if (parent->state == STATE_ACTIVE && parent->active_node_set.size() == 0) {
+			if (parent->state == STATE_ACTIVE && parent->active_node_set.GetCount() == 0) {
 				turnoff_rack(rack);
 			}
 		}
-
 		delete r;
 	}
 }
 
 bool cache_hit(long nid, long bid)
 {
-	std::list<long> *mem = &MEMORY[nid];
+	CAtlList<long> *mem = &MEMORY[nid];
 
-	if (find(mem->begin(), mem->end(), bid) == mem->end()) {
+	if (mem->Find(bid) == NULL) {
 		T_CACHE_MISS->record(1.0);
 		return false;
 	}
@@ -242,20 +267,15 @@ bool cache_hit(long nid, long bid)
 
 void mem_caching(long nid, long bid)
 {
-	std::list<long> *mem = &MEMORY[nid];
-	std::list<long>::iterator iter;
+	CAtlList<long> *mem = &MEMORY[nid];
 
-	if (mem->size() >= MEMORY_SIZE) {
-		iter = find(mem->begin(), mem->end(), bid);
-
-		if (iter != mem->end()) {
-			mem->remove(bid);
+	if (mem->GetCount() >= MEMORY_SIZE) {
+		if (mem->Find(bid) != NULL) {
+			mem->RemoveAt(mem->Find(bid));
 		}
-		else {
-			mem->pop_back();
-		}
+		else {			mem->RemoveTailNoReturn();		}
 	}
-	MEMORY[nid].push_front(bid);
+	MEMORY[nid].AddHead(bid);
 }
 
 void node_cpu(long id, double t)

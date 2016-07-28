@@ -2,10 +2,10 @@
 
 long MAX_FILE_ID, MAX_BLOCK_ID;
 //struct block_t BLOCK_ARR[DATA_BLOCK_NUM];
-std::unordered_map<long, block_t*> BLOCK_MAP;
-std::unordered_map<long, file_t*> FILE_MAP;
-std::vector<file_t*> FILE_VEC[MOD_FACTOR];
-std::map<long, std::list<std::pair<double, long>>> FILE_HISTORY;
+CAtlMap<long, block_t*> BLOCK_MAP;
+CAtlMap<long, file_t*> FILE_MAP;
+CAtlArray<file_t*> FILE_VEC[MOD_FACTOR];
+CAtlMap<long, CAtlList<std::pair<double, long>>> FILE_HISTORY;
 
 extern long SETUP_TIME_WINDOW, SETUP_FILE_SIZE, SETUP_MODE_TYPE, SETUP_LIMIT_K;
 extern long MANAGER_BAG_SIZE;
@@ -13,14 +13,14 @@ extern long REPORT_TOP_K;
 extern double SETUP_DATA_LAYOUT;
 extern node_t NODES[NODE_NUM];
 extern rack_t RACKS[RACK_NUM];
-extern std::list<rack_t*> MANAGER_RANK;
+extern CAtlList<rack_t*> MANAGER_RANK;
 
 void gen_file(void)
 {
 	long i, j, node, rack, min, max, sum = 0, g;
 	block_t *b;
 	file_t *f;
-	FILE_HISTORY.clear();
+	FILE_HISTORY.RemoveAll();
 
 	if (FB_WORKLOAD == true) {
 		FILE *fd = fopen(FB_DATA_PATH, "r");
@@ -30,12 +30,12 @@ void gen_file(void)
 
 		if (fd == NULL) exit(EXIT_FAILURE);
 		while (EOF != fscanf(fd, "%ld%lf%lf%ld%ld%ld%ld", &job_id, &gen_t, &hold_t, &maps, &shuffles, &reduces, &file_id)) {
-			if (FILE_MAP.find(file_id) != FILE_MAP.end()) continue;
+			if (FILE_MAP.Lookup(file_id) != NULL) continue;
 			maps = ceil((double)maps * FB_LOAD_RATIO);
 			if (maps > 0) {
 				f = new file_t;
 				f->id = file_id;
-				f->acc.clear();
+				f->acc.RemoveAll();
 
 				for (i = 0; i < maps; ++i) {
 					b = BLOCK_MAP[MAX_BLOCK_ID] = new block_t;
@@ -44,8 +44,8 @@ void gen_file(void)
 
 					node = node_id++;
 					node_id = node_id >= CS_NODE_NUM ? (0) : node_id;
-					b->local_node[node] = &NODES[node];
-					b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
+					b->local_node.SetAt(node, &NODES[node]);//b->local_node[node] = &NODES[node];
+					b->local_rack.SetAt(GET_RACK_FROM_NODE(node), 1);;//b->local_rack[GET_RACK_FROM_NODE(node)] = 1;;
 					++NODES[node].space.used;
 					++NODES[node].space.disk.used;
 					NODES[node].space.disk.blocks[b->id] = b;
@@ -54,8 +54,9 @@ void gen_file(void)
 					for (j = 1; j < REPLICATION_FACTOR; ++j) {
 						if (SETUP_DATA_LAYOUT == 1) {
 							node = node + CS_NODE_NUM;
-							b->local_node[node] = &NODES[node];
-							b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
+							b->local_node.SetAt(node, &NODES[node]);//b->local_node[node] = &NODES[node];
+							rack = GET_RACK_FROM_NODE(node);
+							b->local_rack.SetAt(rack, 1);//b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
 							++NODES[node].space.used;
 							++NODES[node].space.disk.used;
 							NODES[node].space.disk.blocks[b->id] = b;
@@ -65,8 +66,9 @@ void gen_file(void)
 							long nmin = CS_NODE_NUM * j;
 							long nmax = nmin + CS_NODE_NUM - 1;
 							node = uniform_int(nmin, nmax);
-							b->local_node[node] = &NODES[node];
-							b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
+							b->local_node.SetAt(node, &NODES[node]);//b->local_node[node] = &NODES[node];
+							rack = GET_RACK_FROM_NODE(node);
+							b->local_rack.SetAt(rack, 1);//b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
 							++NODES[node].space.used;
 							++NODES[node].space.disk.used;
 							NODES[node].space.disk.blocks[b->id] = b;
@@ -74,14 +76,14 @@ void gen_file(void)
 						}
 					}
 
-					f->blocks.push_back(b);
+					f->blocks.Add(b);
 
 					++MAX_BLOCK_ID;
 				}
 				f->size = maps;
 
 				FILE_MAP[f->id] = f;
-				FILE_VEC[f->id % MOD_FACTOR].push_back(f);
+				FILE_VEC[f->id % MOD_FACTOR].Add(f);
 				sum = sum + maps;
 				++MAX_FILE_ID;
 			}
@@ -93,7 +95,7 @@ void gen_file(void)
 		while (sum < DATA_BLOCK_NUM) {
 			f = new file_t;
 			f->id = MAX_FILE_ID;
-			f->acc.clear();
+			f->acc.RemoveAll();
 
 			for (i = 0; i < SETUP_FILE_SIZE; ++i) {
 				b = BLOCK_MAP[MAX_BLOCK_ID] = new block_t;
@@ -106,8 +108,9 @@ void gen_file(void)
 				max = min + NODE_NUM_IN_RACK - 1;
 
 				node = uniform_int(min, max);
-				b->local_node[node] = &NODES[node];
-				b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
+				b->local_node.SetAt(node, &NODES[node]);//b->local_node[node] = &NODES[node];
+				rack = GET_RACK_FROM_NODE(node);
+				b->local_rack.SetAt(rack, 1);//b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
 				++NODES[node].space.used;
 				++NODES[node].space.disk.used;
 				NODES[node].space.disk.blocks[b->id] = b;
@@ -115,21 +118,21 @@ void gen_file(void)
 
 				for (j = 1; j < REPLICATION_FACTOR; ++j) {
 					node = node + CS_NODE_NUM;
-					b->local_node[node] = &NODES[node];
-					b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
+					b->local_node.SetAt(node, &NODES[node]);//b->local_node[node] = &NODES[node];
+					rack = GET_RACK_FROM_NODE(node);
+					b->local_rack.SetAt(rack, 1);//b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
 					++NODES[node].space.used;
 					++NODES[node].space.disk.used;
 					NODES[node].space.disk.blocks[b->id] = b;
 					RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
 				}
-
-				f->blocks.push_back(b);
+				f->blocks.Add(b);
 				++MAX_BLOCK_ID;
 			}
 			f->size = SETUP_FILE_SIZE;
 
 			FILE_MAP[MAX_FILE_ID] = f;
-			FILE_VEC[MAX_FILE_ID % MOD_FACTOR].push_back(f);
+			FILE_VEC[MAX_FILE_ID % MOD_FACTOR].Add(f);
 			sum = sum + SETUP_FILE_SIZE;
 			++MAX_FILE_ID;
 			if (++ori_g == CS_RACK_NUM) ori_g = 0;
@@ -143,33 +146,36 @@ long_map_t* GetPopularBlockList(long *top_k)
 	long req, acc, max = 0;
 	block_t *block;
 	file_t *file;
-	std::map<long, std::list<std::pair<double, long>>>::iterator mit;
-	std::list<std::pair<double, long>>::iterator lit;
-	std::vector<block_t*>::iterator bit;
+	POSITION mpos, lpos, bpos, fpos;
 	long_map_t *bag = new long_map_t;
 	long_map_t fmax;
-	long_map_t::iterator fit;
 
 	curt = clock;
-	fmax.clear();
+	fmax.RemoveAll();
 	prevt = curt - SETUP_TIME_WINDOW;
 	prevt = (prevt > 0 ? prevt : 0);
 
 	if (SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) {
 		MANAGER_BAG_SIZE = 0;
-
 		for (long i = 0; i < RACK_NUM; ++i) {
 			RACKS[i].rank = 0;
 		}
 	}
 
-	for (mit = FILE_HISTORY.begin(); mit != FILE_HISTORY.end(); ++mit) {
-		file = FILE_MAP[mit->first];
-		for (lit = mit->second.begin(); lit != mit->second.end(); NULL) {
-			if (lit->first < prevt)
-				mit->second.erase(lit++);
+	for (mpos = FILE_HISTORY.GetStartPosition(); 
+		mpos != NULL; 
+		FILE_HISTORY.GetNext(mpos)) {
+		CAtlMap<long, CAtlList<std::pair<double, long>>>::CPair *mpair = FILE_HISTORY.GetAt(mpos);
+		file = FILE_MAP[mpair->m_key];
+		for (lpos = mpair->m_value.GetHeadPosition(); lpos != NULL; NULL) {
+			std::pair<double, long> lpair = mpair->m_value.GetAt(lpos);
+			if (lpair.first < prevt) {
+				POSITION rpos = lpos;
+				mpair->m_value.GetNext(lpos);
+				mpair->m_value.RemoveAt(rpos);
+			}
 			else {
-				acc = lit->second;
+				acc = lpair.second;
 				if (acc > max)
 					max = acc;
 
@@ -182,24 +188,27 @@ long_map_t* GetPopularBlockList(long *top_k)
 
 				if (fmax[file->id] < req)
 					fmax[file->id] = req;
-				++lit;
+				mpair->m_value.GetNext(lpos);
 			}
 		}
 	}
 
-	for (fit = fmax.begin(); fit != fmax.end(); ++fit) {
-		file = FILE_MAP[fit->first];
+	for (fpos = fmax.GetStartPosition(); 
+		fpos != NULL; 
+		fmax.GetNext(fpos)) {
+		long_map_t::CPair *fpair = fmax.GetAt(fpos);
+		file = FILE_MAP[fpair->m_key];
 
-		for (bit = file->blocks.begin(); bit != file->blocks.end(); ++bit) {
-			block = (*bit);
+		for (long i = 0; i < file->blocks.GetCount(); i++) {
+			block = file->blocks[i];
 			if (SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) {
-				long_map_t::iterator item = block->local_rack.begin(),
-					end = block->local_rack.end();
-				while (++item != end) {
-					RACKS[item->first].rank += fit->second;
+				POSITION pos = block->local_rack.GetHeadPosition();
+				while (pos != NULL) {
+					RACKS[block->local_rack.GetKeyAt(pos)].rank += fpair->m_value;
+					block->local_rack.GetNext(pos);
 				}
-				MANAGER_BAG_SIZE += fit->second;
-				(*bag)[block->id] = fit->second;
+				MANAGER_BAG_SIZE += fpair->m_value;
+				(*bag)[block->id] = fpair->m_value;
 			}
 			else if (SETUP_MODE_TYPE == MODE_IPACS) {
 				(*bag)[block->id] = max;
@@ -208,11 +217,11 @@ long_map_t* GetPopularBlockList(long *top_k)
 	}
 
 	REPORT_TOP_K = *top_k = max;
-	if (!bag->empty()) {
+	if (!bag->IsEmpty()) {
 		if (SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) {
-			MANAGER_RANK.clear();
+			MANAGER_RANK.RemoveAll();
 			for (long i = CS_RACK_NUM; i < RACK_NUM; ++i) {
-				MANAGER_RANK.push_back(&RACKS[i]);
+				MANAGER_RANK.AddTail(&RACKS[i]);
 			}
 		}
 	}
@@ -222,7 +231,7 @@ long_map_t* GetPopularBlockList(long *top_k)
 
 block_t* GetBlock(long id)
 {
-	if (id > BLOCK_MAP.size())
+	if (id > BLOCK_MAP.GetCount())
 		return NULL;
 
 	return BLOCK_MAP[id];

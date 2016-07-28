@@ -46,10 +46,10 @@ void sim_report(void)
 			+ (REPORT_NODE_STATE_COUNT[STATE_DEACTIVATE] * (NODE_D_POWER / HOUR))
 			+ ((REPORT_NODE_STATE_COUNT[STATE_ACTIVE] - CS_NODE_NUM) * (NODE_A_POWER / HOUR));
 
-		REPORT_NODE.first += ACTIVE_NODE_SET.size();
+		REPORT_NODE.first += ACTIVE_NODE_SET.GetCount();
 		REPORT_NODE.second++;
 
-		REPORT_RACK.first += ACTIVE_RACK_SET.size();
+		REPORT_RACK.first += ACTIVE_RACK_SET.GetCount();
 		REPORT_RACK.second++;
 
 		if (t > 0 && (t % hold_t) == 0) {

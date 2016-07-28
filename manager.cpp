@@ -5,9 +5,10 @@ bool MANAGER_CS_RACKS[RACK_NUM] = { false, };
 bool stable = true;
 long MANAGER_BAG_SIZE, MANAGER_BUDGET_SIZE;
 node_map_t MANAGER_CS_NODES;
-std::list<long> INCOMPLETE_MAP_TASKS_Q, PEAK_MAP_TASKS_Q;
-std::list<rack_t*> MANAGER_RANK;
-std::map<long, std::map<long, std::list<long>>> MANAGER_BUDGET_MAP;
+CAtlList<long> INCOMPLETE_MAP_TASKS_Q, PEAK_MAP_TASKS_Q;
+CAtlList<rack_t*> MANAGER_RANK;
+CAtlMap<long, CAtlMap<long, CAtlList<long>>> MANAGER_BUDGET_MAP;
+//CAtlMap<long, CAtlMap<long, long>> MANAGER_LOCAL_MAP;
 long_map_t UPSET, DOWNSET;
 
 extern node_t NODES[NODE_NUM];
@@ -24,9 +25,33 @@ extern rack_map_t ACTIVE_RACK_NPG_SET, NPG_SET;
 extern mailbox *M_NODE[NODE_NUM];
 extern std::pair<double, long> REPORT_AVG_M;
 extern std::pair<long, long> REPORT_CAP, REPORT_REQ_M;
-extern std::map<long, std::map<long, bool>> BUDGET_MAP;
+extern CAtlMap<long, CAtlMap<long, bool>> BUDGET_MAP;
 extern long REPORT_BUDGET_SIZE;
 extern long NODE_RANK[NODE_NUM];
+
+void rank_quick_sort(CAtlList<rack_t*> *list, long left, long right) {
+	long i = left, j = right;
+	long pivot = list->GetAt(list->FindIndex((left + right) / 2))->rank;
+
+	/* partition */
+	while (i <= j) {
+		while (list->GetAt(list->FindIndex(i))->rank > pivot)
+			i++;
+		while (list->GetAt(list->FindIndex(j))->rank < pivot)
+			j--;
+		if (i <= j) {
+			list->SwapElements(list->FindIndex(i), list->FindIndex(j));
+			i++;
+			j--;
+		}
+	}
+
+	/* recursion */
+	if (left < j)
+		rank_quick_sort(list, left, j);
+	if (i < right)
+		rank_quick_sort(list, i, right);
+}
 
 void state_manager(void)
 {
@@ -40,27 +65,28 @@ void state_manager(void)
 
 	create("state manager");
 	while (!CSIM_END) {
-		if (stable == false && UPSET.empty() && DOWNSET.empty())
+		if (stable == false && UPSET.IsEmpty() && DOWNSET.IsEmpty())
 			stable = true;
 
-		if (INCOMPLETE_MAP_TASKS_Q.size() >= SETUP_TIME_WINDOW) {
-			m_total -= INCOMPLETE_MAP_TASKS_Q.front();
-			INCOMPLETE_MAP_TASKS_Q.pop_front();
+		if (INCOMPLETE_MAP_TASKS_Q.GetCount() >= SETUP_TIME_WINDOW) {
+			m_total -= INCOMPLETE_MAP_TASKS_Q.RemoveHead();
 		}
 		m_total += REMAIN_MAP_TASKS;
-		INCOMPLETE_MAP_TASKS_Q.push_back(REMAIN_MAP_TASKS);
+		INCOMPLETE_MAP_TASKS_Q.AddTail(REMAIN_MAP_TASKS);
 
-		REPORT_AVG_M.first += (double)m_total / (double)INCOMPLETE_MAP_TASKS_Q.size();
+		REPORT_AVG_M.first += (double)m_total / (double)INCOMPLETE_MAP_TASKS_Q.GetCount();
 		REPORT_AVG_M.second++;
 
-		REPORT_CAP.first += ACTIVE_NODE_SET.size() * MAP_SLOTS;
+		REPORT_CAP.first += ACTIVE_NODE_SET.GetCount() * MAP_SLOTS;
 		REPORT_CAP.second++;
 
 		if (SETUP_MODE_TYPE == MODE_SIERRA && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0 && stable == true) {
 			m = 0;
-			for (std::list<long>::iterator it = INCOMPLETE_MAP_TASKS_Q.begin(); it != INCOMPLETE_MAP_TASKS_Q.end(); ++it) {
-				if (m < *it)
-					m = *it;
+			POSITION pos = INCOMPLETE_MAP_TASKS_Q.GetHeadPosition();
+			while (pos != NULL) {
+				if (m < INCOMPLETE_MAP_TASKS_Q.GetAt(pos))
+					m = INCOMPLETE_MAP_TASKS_Q.GetAt(pos);
+				INCOMPLETE_MAP_TASKS_Q.GetNext(pos);
 			}
 			stable = false;
 			req_m = m - (CS_NODE_NUM * MAP_SLOTS);
@@ -73,10 +99,10 @@ void state_manager(void)
 
 		if (SETUP_MODE_TYPE == MODE_IPACS && clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0 && stable == true) {
 			bag = GetPopularBlockList(&top_k);
-			if (bag->empty() == false) {
+			if (bag->IsEmpty() == false) {
 				stable = false;
 				m = (double)m_total / (double)SETUP_TIME_WINDOW;
-				mcap = ACTIVE_NODE_SET.size() * MAP_SLOTS;
+				mcap = ACTIVE_NODE_SET.GetCount() * MAP_SLOTS;
 				req_m = m - (CS_NODE_NUM * MAP_SLOTS);
 				REPORT_REQ_M.first += req_m;
 				REPORT_REQ_M.second++;
@@ -89,9 +115,11 @@ void state_manager(void)
 		if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC)
 			&& clock > 0 && ((long)clock % (long)SETUP_TIME_WINDOW) == 0 && stable == true) {
 			m = 0;
-			for (std::list<long>::iterator it = INCOMPLETE_MAP_TASKS_Q.begin(); it != INCOMPLETE_MAP_TASKS_Q.end(); ++it) {
-				if (m < *it)
-					m = *it;
+			POSITION pos = INCOMPLETE_MAP_TASKS_Q.GetHeadPosition();
+			while (pos != NULL) {
+				if (m < INCOMPLETE_MAP_TASKS_Q.GetAt(pos))
+					m = INCOMPLETE_MAP_TASKS_Q.GetAt(pos);
+				INCOMPLETE_MAP_TASKS_Q.GetNext(pos);
 			}
 			stable = false;
 			req_m = m - (CS_NODE_NUM * MAP_SLOTS);
@@ -101,20 +129,6 @@ void state_manager(void)
 			bag = GetPopularBlockList(&top_k);
 			bag = FindPCS(MANAGER_CS, bag, req_m);
 			ActivateNodes(MANAGER_CS, bag);
-
-			/*mcap = ACTIVE_NODE_SET.size() * MAP_SLOTS;
-			if ((m / mcap >= 1 + SETUP_ALPHA && STANDBY_NODE_SET.size() > 0)
-					|| (m / mcap < 1 - SETUP_BETA && ACTIVE_NODE_SET.size() > CS_NODE_NUM)) {
-				stable = false;
-				req_m = m - (CS_NODE_NUM * MAP_SLOTS);
-				REPORT_REQ_M.first += req_m;
-				REPORT_REQ_M.second++;
-
-				bag = GetPopularBlockList(&top_k);
-				bag = FindPCS(MANAGER_CS, bag, req_m);
-
-				ActivateNodes(MANAGER_CS, bag);
-			}*/
 		}
 
 		hold(TIME_UNIT);
@@ -129,19 +143,21 @@ long_map_t* FindSierra(bool cs[], long top_k, long req_m)
 
 	for (g = 1; g < REPLICATION_FACTOR; ++g) {
 		node_map_t S;
-		S.clear();
+		S.RemoveAll();
 		for (node = CS_NODE_NUM * g; node < CS_NODE_NUM * (g + 1); ++node) {
-			S[node] = &NODES[node];
+			S.SetAt(node, &NODES[node]);//S[node] = &NODES[node];
 		}
-		while (req_m > 0 && S.size() > 0) {
-			node_map_t::iterator item = S.begin();
-			std::advance(item, uniform_int(0, S.size() - 1));
-			node = item->first;
+		while (req_m > 0 && S.GetCount() > 0) {
+			POSITION pos = S.GetHeadPosition();
+			long i = uniform_int(0, S.GetCount() - 1);
+			while (i--)
+				S.GetNext(pos);
+			node = S.GetKeyAt(pos);
 			if (MANAGER_CS[node] == false) {
 				MANAGER_CS[node] = true;
 				req_m = req_m - MAP_SLOTS;
 			}
-			S.erase(item);
+			S.RemoveAt(pos);
 		}
 	}
 
@@ -151,27 +167,32 @@ long_map_t* FindSierra(bool cs[], long top_k, long req_m)
 long_map_t* FindiPACS(bool cs[], long_map_t *bag, long top_k, long req_m)
 {
 	long node;
+	CAtlList<long> rkeys;
 	memset(&MANAGER_CS, false, sizeof(bool) * NODE_NUM);
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
 
 	top_k = MIN(top_k, REPLICATION_FACTOR) - 1;
 
 	if (top_k > 0) {
-		long_map_t::iterator iter;
-		for (iter = bag->begin(); iter != bag->end(); bag->erase(iter++)) {
+		POSITION pos = bag->GetStartPosition();
+		while (pos != NULL) {
 			long cnt = top_k;
-			block_t *block = GetBlock(iter->first);
-			node_map_t::iterator item = block->local_node.begin();
+			block_t *block = GetBlock(bag->GetKeyAt(pos));
+			POSITION npos = block->local_node.GetHeadPosition();
 			while (cnt--) {
-				++item;
-				node = item->first;
+				block->local_node.GetNext(npos);
+				node = block->local_node.GetKeyAt(npos);
 				if (MANAGER_CS[node] == false) {
 					MANAGER_CS[node] = true;
 					req_m = req_m - MAP_SLOTS;
 				}
 			}
+			rkeys.AddTail(block->id);
+			bag->GetNext(pos);	
 		}
 	}
+	for (POSITION pos = rkeys.GetHeadPosition(); pos != NULL; rkeys.GetNext(pos))
+		bag->RemoveKey(rkeys.GetAt(pos));
 	return bag;
 }
 
@@ -181,35 +202,45 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 	long i, budget_size = 0, bag_size = MANAGER_BAG_SIZE;
 	node_t *node;
 	rack_t *rack;
-	rack_map_t F = NPG_SET;
-	rack_map_t F_INTERSECT_RACTIVE = ACTIVE_RACK_NPG_SET;
+	rack_map_t F;// = NPG_SET;
+	rack_map_t F_INTERSECT_RACTIVE;// = ACTIVE_RACK_NPG_SET;
+
+	for (POSITION pos = NPG_SET.GetHeadPosition(); pos != NULL; NPG_SET.GetNext(pos))
+		F.SetAt(NPG_SET.GetKeyAt(pos), NPG_SET.GetValueAt(pos));//F[NPG_SET.GetKeyAt(pos)] = NPG_SET.GetValueAt(pos);
+	for (POSITION pos = ACTIVE_RACK_NPG_SET.GetHeadPosition(); pos != NULL; ACTIVE_RACK_NPG_SET.GetNext(pos))
+		F_INTERSECT_RACTIVE.SetAt(ACTIVE_RACK_NPG_SET.GetKeyAt(pos), ACTIVE_RACK_NPG_SET.GetValueAt(pos));
+		//F_INTERSECT_RACTIVE[ACTIVE_RACK_NPG_SET.GetKeyAt(pos)] = ACTIVE_RACK_NPG_SET.GetValueAt(pos);
+
 	memset(&MANAGER_CS, false, sizeof(bool) * NODE_NUM);
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
 	memset(&MANAGER_CS_RACKS, false, sizeof(bool) * RACK_NUM);
 	memset(&MANAGER_CS_RACKS, true, sizeof(bool) * CS_RACK_NUM);
 
-	while ((req_m > 0 || !bag->empty()) && !F.empty()) {
-		if (!bag->empty()) {
+	while ((req_m > 0 || !bag->IsEmpty()) && !F.IsEmpty()) {
+		if (!bag->IsEmpty()) {
 			if (sorted == false) {
 				sorted = true;
-				MANAGER_RANK.sort(sort_rank);
+				rank_quick_sort(&MANAGER_RANK, 0, MANAGER_RANK.GetCount() - 1);
 			}
 
-			i = MANAGER_RANK.front()->id;
-			MANAGER_RANK.pop_front();
+			i = MANAGER_RANK.RemoveHead()->id;
 		}
-		else if (!F_INTERSECT_RACTIVE.empty()) {
-			rack_map_t::iterator item = F_INTERSECT_RACTIVE.begin();
-			std::advance(item, uniform_int(0, F_INTERSECT_RACTIVE.size() - 1));
-			i = item->second->id;
-			F_INTERSECT_RACTIVE.erase(i);
+		else if (!F_INTERSECT_RACTIVE.IsEmpty()) {
+			POSITION pos = F_INTERSECT_RACTIVE.GetHeadPosition();
+			long iter = uniform_int(0, F_INTERSECT_RACTIVE.GetCount() - 1);
+			while (iter--)
+				F_INTERSECT_RACTIVE.GetNext(pos);
+			i = F_INTERSECT_RACTIVE.GetValueAt(pos)->id;
+			F_INTERSECT_RACTIVE.RemoveKey(i);
 		}
 		else {
-			rack_map_t::iterator item = F.begin();
-			std::advance(item, uniform_int(0, F.size() - 1));
-			i = item->second->id;
+			POSITION pos = F.GetHeadPosition();
+			long iter = uniform_int(0, F.GetCount() - 1);
+			while (iter--)
+				F.GetNext(pos);
+			i = F.GetValueAt(pos)->id;
 		}
-		F.erase(i);
+		F.RemoveKey(i);
 		rack = &RACKS[i];
 		MANAGER_CS_RACKS[i] = true;
 
@@ -219,58 +250,62 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 		while (nid < nend) {
 			node = &NODES[nid];
 			if (MANAGER_CS[node->id] == false) {
-				MANAGER_CS_NODES[node->id] = node;
+				CAtlList<long> rk;
+				MANAGER_CS_NODES.SetAt(node->id, node);//MANAGER_CS_NODES[node->id] = node;
 				MANAGER_CS[node->id] = true;
 				req_m = req_m - MAP_SLOTS;
 				
 				// Invalidate replicas of n's storage budget that are not appeared in bag;
-				std::map<long, void*>::iterator itr = node->space.budget.blocks.begin(),
-					iend = node->space.budget.blocks.end();
-				while (itr != iend) {
-					block_t *b = (block_t*)itr->second;
-					if (bag->find(b->id) == bag->end()) {
-						b->local_node.erase(node->id);
-						b->local_rack.erase(GET_RACK_FROM_NODE(node->id));
-						node->space.budget.blocks.erase(itr++);
+				POSITION bpos = node->space.budget.blocks.GetStartPosition();
+				while (bpos != NULL) {
+					CAtlMap<long, void*>::CPair *pair = node->space.budget.blocks.GetAt(bpos);
+					block_t *b = (block_t*)pair->m_value;
+					if (bag->Lookup(b->id) == NULL) {
+						b->local_node.RemoveKey(node->id);
+						b->local_rack.RemoveKey(GET_RACK_FROM_NODE(node->id));
+						rk.AddTail(node->space.budget.blocks.GetKeyAt(bpos));
+						node->space.budget.blocks.GetNext(bpos);
 						--node->space.used;
 						--node->space.budget.used;
 						
-						BUDGET_MAP[b->id].erase(node->id);
-						if (BUDGET_MAP[b->id].empty()) {
-							BUDGET_MAP.erase(b->id);
+						BUDGET_MAP[b->id].RemoveKey(node->id);
+						if (BUDGET_MAP[b->id].IsEmpty()) {
+							BUDGET_MAP.RemoveKey(b->id);
 						}
 						--REPORT_BUDGET_SIZE;
 					}
 					else {
-						++itr;
+						node->space.budget.blocks.GetNext(bpos);
 					}
 				}
+
+				// remove
+				for (POSITION p = rk.GetHeadPosition(); p != NULL; rk.GetNext(p))
+					node->space.budget.blocks.RemoveKey(rk.GetAt(p));
 
 				// B = B - n.getBlockList();
-				itr = node->space.disk.blocks.begin(),
-					iend = node->space.disk.blocks.end();
-				while (itr != iend) {	// disk
-					block_t *b = (block_t*)itr->second;
-					if (bag->find(b->id) != bag->end()) {
+				POSITION dpos = node->space.disk.blocks.GetStartPosition();
+				while (dpos != NULL) {	// disk
+					block_t *b = (block_t*)node->space.disk.blocks.GetValueAt(dpos);
+					if (bag->Lookup(b->id) != NULL) {
 						if (--(*bag)[b->id] == 0) {
-							bag->erase(b->id);
+							bag->RemoveKey(b->id);
 						}
 						--bag_size;
 					}
-					++itr;
+					node->space.disk.blocks.GetNext(dpos);
 				}
 
-				itr = node->space.budget.blocks.begin(),
-					iend = node->space.budget.blocks.end();
-				while (itr != iend) {	// budget
-					block_t *b = (block_t*)itr->second;
-					if (bag->find(b->id) != bag->end()) {
+				bpos = node->space.budget.blocks.GetStartPosition();
+				while (bpos != NULL) {	// budget
+					block_t *b = (block_t*)node->space.budget.blocks.GetValueAt(bpos);
+					if (bag->Lookup(b->id) != NULL) {
 						if (--(*bag)[b->id] == 0) {
-							bag->erase(b->id);
+							bag->RemoveKey(b->id);
 						}
 						--bag_size;
 					}
-					++itr;
+					node->space.budget.blocks.GetNext(bpos);
 				}
 
 				budget_size = budget_size + (node->space.budget.capacity - node->space.budget.used);
@@ -296,121 +331,140 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 {
 	long i;
 	msg_t *msg;
-	UPSET.clear();
-	DOWNSET.clear();
+	CAtlList<long> rk;
+	UPSET.RemoveAll();
+	DOWNSET.RemoveAll();
 
-	if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) && !bag->empty()) { // TODO: using bag
+	if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) && !bag->IsEmpty()) { // TODO: using bag
 		long listSize = MANAGER_BAG_SIZE;
 		long sBudgetSize = MANAGER_BUDGET_SIZE;
 
-		if (MANAGER_CS_NODES.size() == 1) {	// turn on two nodes more for distribute replications
-			node_t *node = MANAGER_CS_NODES.begin()->second;
+		if (MANAGER_CS_NODES.GetCount() == 1) {	// turn on two nodes more for distribute replications
+			node_t *node = MANAGER_CS_NODES.GetValueAt(MANAGER_CS_NODES.GetHeadPosition());
 			for (i = 0; i < 2; ++i) {
+				rk.RemoveAll();
 				node = &NODES[node->id + 1];
-				MANAGER_CS_NODES[node->id] = node;
+				MANAGER_CS_NODES.SetAt(node->id, node);//MANAGER_CS_NODES[node->id] = node;
 				MANAGER_CS[node->id] = true;
-				std::map<long, void*>::iterator itr = node->space.budget.blocks.begin(), iend = node->space.budget.blocks.end();
-				while (itr != iend) {
-					block_t *b = (block_t*)itr->second;
-					if (bag->find(b->id) == bag->end()) {
-						b->local_node.erase(node->id);
-						b->local_rack.erase(GET_RACK_FROM_NODE(node->id));
-						node->space.budget.blocks.erase(itr++);
+				POSITION pos = node->space.budget.blocks.GetStartPosition();
+				while (pos != NULL) {
+					block_t *b = (block_t*)node->space.budget.blocks.GetValueAt(pos);
+					if (bag->Lookup(b->id) == NULL) {
+						b->local_node.RemoveKey(node->id);
+						b->local_rack.RemoveKey(GET_RACK_FROM_NODE(node->id));
+						rk.AddTail(node->space.budget.blocks.GetKeyAt(pos));
+						node->space.budget.blocks.GetNext(pos);
 						--node->space.used;
 						--node->space.budget.used;
 
-						BUDGET_MAP[b->id].erase(node->id);
-						if (BUDGET_MAP[b->id].empty()) {
-							BUDGET_MAP.erase(b->id);
+						BUDGET_MAP[b->id].RemoveKey(node->id);
+						if (BUDGET_MAP[b->id].IsEmpty()) {
+							BUDGET_MAP.RemoveKey(b->id);
 						}
 						--REPORT_BUDGET_SIZE;
 					}
 					else {
-						++itr;
+						node->space.budget.blocks.GetNext(pos);
 					}
 				}
-				itr = node->space.disk.blocks.begin(), iend = node->space.disk.blocks.end();
-				while (itr != iend) {	// disk
-					block_t *b = (block_t*)itr->second;
-					if (bag->find(b->id) != bag->end()) {
+				
+				// remove
+				for (POSITION p = rk.GetHeadPosition(); p != NULL; rk.GetNext(p))
+					node->space.budget.blocks.RemoveKey(rk.GetAt(p));
+
+				pos = node->space.disk.blocks.GetStartPosition();
+				while (pos != NULL) {	// disk
+					block_t *b = (block_t*)node->space.disk.blocks.GetValueAt(pos);
+					if (bag->Lookup(b->id) != NULL) {
 						if (--(*bag)[b->id] == 0) {
-							bag->erase(b->id);
+							bag->RemoveKey(b->id);
 						}
 						--listSize;
 					}
-					++itr;
+					node->space.disk.blocks.GetNext(pos);
 				}
-				itr = node->space.budget.blocks.begin(), iend = node->space.budget.blocks.end();
-				while (itr != iend) {	// budget
-					block_t *b = (block_t*)itr->second;
-					if (bag->find(b->id) != bag->end()) {
+				pos = node->space.budget.blocks.GetStartPosition();
+				while (pos != NULL) {	// budget
+					block_t *b = (block_t*)node->space.budget.blocks.GetValueAt(pos);
+					if (bag->Lookup(b->id) != NULL) {
 						if (--(*bag)[b->id] == 0) {
-							bag->erase(b->id);
+							bag->RemoveKey(b->id);
 						}
 						--listSize;
 					}
-					++itr;
+					node->space.budget.blocks.GetNext(pos);
 				}
 				sBudgetSize = sBudgetSize + (node->space.budget.capacity - node->space.budget.used);
 			}
 		}
 
-		MANAGER_BUDGET_MAP.clear();
-		std::list<std::pair<long, long>> nlist;
-		node_map_t::iterator it = MANAGER_CS_NODES.begin(), itend = MANAGER_CS_NODES.end();
+		MANAGER_BUDGET_MAP.RemoveAll();
+//		MANAGER_LOCAL_MAP.RemoveAll();
+		CAtlList<std::pair<long, long>> nlist;
+		POSITION pos = MANAGER_CS_NODES.GetHeadPosition();
 		long_map_t nb;
-		while (it != itend) {
-			node_t *node = it->second;
+		while (pos != NULL) {
+			node_t *node = MANAGER_CS_NODES.GetValueAt(pos);
 			long nBudgetSize = node->space.budget.capacity - node->space.budget.used;
 			nb[node->id] = ceil(((double)nBudgetSize / sBudgetSize) * listSize);
 
-			++it;
+			MANAGER_CS_NODES.GetNext(pos);
 		}
 
-		it = MANAGER_CS_NODES.begin(), itend = MANAGER_CS_NODES.end();
+		pos = MANAGER_CS_NODES.GetHeadPosition();
 		long iterNum = listSize;
-		while (it != itend) {
+		while (pos != NULL) {
 			// transfer nb blocks of B from any source nodes to n
 			// B = B - list of transferred blocks
-			node_t *node = it->second;
+			node_t *node = MANAGER_CS_NODES.GetValueAt(pos);
 			long cnt = 0, max_cnt = nb[node->id];
-			long_map_t::iterator bit;
+			POSITION bpos = NULL, npos = NULL;
 			block_t *b;
 			bool same_rack = false;
 			long check_cnt = 0;
-			while (cnt < max_cnt && bag->empty() == false) {
+			while (cnt < max_cnt && bag->IsEmpty() == false) {
 				do {
-					bit = bag->begin();
-					std::advance(bit, uniform_int(0, bag->size() - 1));
-					b = GetBlock(bit->first);
-					node_map_t::iterator nit = b->local_node.begin();
+					bpos = bag->GetStartPosition();
+					long rnum = uniform_int(0, bag->GetCount() - 1);
+					while (rnum--)
+						bag->GetNext(bpos);
+					b = GetBlock(bag->GetKeyAt(bpos));
+					npos = b->local_node.GetHeadPosition();
 					same_rack = false;
-					while (nit != b->local_node.end()) {
-						if (GET_RACK_FROM_NODE(nit->second->id)
+					while (npos != NULL) {
+						if (GET_RACK_FROM_NODE(b->local_node.GetValueAt(npos)->id)
 							== GET_RACK_FROM_NODE(node->id)) {
 							same_rack = true;
 							check_cnt++;
 							break;
 						}
-						++nit;
+						b->local_node.GetNext(npos);
 					}
 					if (same_rack == false || check_cnt > iterNum) {
-						if (SETUP_MODE_TYPE == MODE_PCSC && nit != b->local_node.end()) {
-							node_cpu(nit->second->id, (double)COMP_T);
-						}
 						check_cnt = 0;
 						break;
 					}
 				} while (true);
-				MANAGER_BUDGET_MAP[node->id][GET_RACK_FROM_NODE(node->id)].push_back(b->id);
+				MANAGER_BUDGET_MAP[node->id][GET_RACK_FROM_NODE(node->id)].AddTail(b->id);
+				/*if (SETUP_MODE_TYPE == MODE_PCSC && npos != NULL) {
+					long ln = b->local_node.GetValueAt(npos)->id;
+					if (MANAGER_LOCAL_MAP.Lookup(node->id) == NULL)
+						MANAGER_LOCAL_MAP[node->id][ln] = 1;
+					else {
+						if (MANAGER_LOCAL_MAP[node->id].Lookup(ln) == NULL)
+							MANAGER_LOCAL_MAP[node->id][ln] = 1;
+						else
+							MANAGER_LOCAL_MAP[node->id][ln]++;
+					}
+				}*/
 				if (--(*bag)[b->id] == 0) {
-					bag->erase(b->id);
+					bag->RemoveKey(b->id);
 				}
 				--iterNum;
 				++cnt;
 			}
 			nb[node->id] = 0;
-			++it;
+			MANAGER_CS_NODES.GetNext(pos);
 		}
 	}
 
@@ -433,11 +487,5 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 			}
 		}
 	}
-
 	delete bag;
-}
-
-bool sort_rank(const rack_t *x, const rack_t *y)
-{
-	return x->rank > y->rank;
 }
