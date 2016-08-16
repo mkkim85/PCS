@@ -38,7 +38,7 @@ void setup(void)
 	SETUP_TIME_WINDOW *= MINUTE;
 
 	sprintf(path,
-		"%ldM%ldK%ldTL%ldF%.2lfL%.1lfS%.1lfB%ldT%ldR%ldC%.1lfP%ldS",
+		"%ldM%ldK%ldTL%ldF%.2lfL%.1lfS%.2lfB%ldT%ldR%ldC%.1lfP%ldS",
 		SETUP_MODE_TYPE,
 		SETUP_LIMIT_K,
 		(SETUP_TIME_WINDOW / MINUTE),

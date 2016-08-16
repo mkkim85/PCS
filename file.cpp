@@ -1,7 +1,6 @@
 #include "header.h"
 
 long MAX_FILE_ID, MAX_BLOCK_ID;
-//struct block_t BLOCK_ARR[DATA_BLOCK_NUM];
 CAtlMap<long, block_t*> BLOCK_MAP;
 CAtlMap<long, file_t*> FILE_MAP;
 CAtlArray<file_t*> FILE_VEC[MOD_FACTOR];
@@ -17,14 +16,13 @@ extern CAtlList<rack_t*> MANAGER_RANK;
 
 void gen_file(void)
 {
-	long i, j, node, rack, min, max, sum = 0, g;
+	long i, j, node, rack, min, max, sum = 0, g, ori_g = 0;
 	block_t *b;
 	file_t *f;
 	FILE_HISTORY.RemoveAll();
 
 	if (FB_WORKLOAD == true) {
 		FILE *fd = fopen(FB_DATA_PATH, "r");
-		long node_id = 0, prev_fid = -1;
 		long job_id, maps, shuffles, reduces, file_id;
 		double gen_t, hold_t;
 
@@ -42,8 +40,13 @@ void gen_file(void)
 					b->id = MAX_BLOCK_ID;
 					b->file_id = f->id;
 
-					node = node_id++;
-					node_id = node_id >= CS_NODE_NUM ? (0) : node_id;
+					g = (prob() < 1 - SETUP_DATA_LAYOUT) ? uniform_int(0, CS_RACK_NUM - 1) : ori_g;
+
+					min = g * NODE_NUM_IN_RACK;
+					max = min + NODE_NUM_IN_RACK - 1;
+					node = uniform_int(min, max);
+					//node = node_id++;
+					//node_id = node_id >= CS_NODE_NUM ? (0) : node_id;
 					b->local_node.SetAt(node, &NODES[node]);//b->local_node[node] = &NODES[node];
 					b->local_rack.SetAt(GET_RACK_FROM_NODE(node), 1);;//b->local_rack[GET_RACK_FROM_NODE(node)] = 1;;
 					++NODES[node].space.used;
@@ -52,32 +55,16 @@ void gen_file(void)
 					RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
 
 					for (j = 1; j < REPLICATION_FACTOR; ++j) {
-						if (SETUP_DATA_LAYOUT == 1) {
-							node = node + CS_NODE_NUM;
-							b->local_node.SetAt(node, &NODES[node]);//b->local_node[node] = &NODES[node];
-							rack = GET_RACK_FROM_NODE(node);
-							b->local_rack.SetAt(rack, 1);//b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
-							++NODES[node].space.used;
-							++NODES[node].space.disk.used;
-							NODES[node].space.disk.blocks[b->id] = b;
-							RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
-						}
-						else {
-							long nmin = CS_NODE_NUM * j;
-							long nmax = nmin + CS_NODE_NUM - 1;
-							node = uniform_int(nmin, nmax);
-							b->local_node.SetAt(node, &NODES[node]);//b->local_node[node] = &NODES[node];
-							rack = GET_RACK_FROM_NODE(node);
-							b->local_rack.SetAt(rack, 1);//b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
-							++NODES[node].space.used;
-							++NODES[node].space.disk.used;
-							NODES[node].space.disk.blocks[b->id] = b;
-							RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
-						}
+						node = node + CS_NODE_NUM;
+						b->local_node.SetAt(node, &NODES[node]);//b->local_node[node] = &NODES[node];
+						rack = GET_RACK_FROM_NODE(node);
+						b->local_rack.SetAt(rack, 1);//b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
+						++NODES[node].space.used;
+						++NODES[node].space.disk.used;
+						NODES[node].space.disk.blocks[b->id] = b;
+						RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
 					}
-
 					f->blocks.Add(b);
-
 					++MAX_BLOCK_ID;
 				}
 				f->size = maps;
@@ -86,12 +73,12 @@ void gen_file(void)
 				FILE_VEC[f->id % MOD_FACTOR].Add(f);
 				sum = sum + maps;
 				++MAX_FILE_ID;
+				if (++ori_g == CS_RACK_NUM) ori_g = 0;
 			}
 		}
 		fclose(fd);
 	}
 	else {
-		long ori_g = 0;
 		while (sum < DATA_BLOCK_NUM) {
 			f = new file_t;
 			f->id = MAX_FILE_ID;
@@ -106,15 +93,15 @@ void gen_file(void)
 
 				min = g * NODE_NUM_IN_RACK;
 				max = min + NODE_NUM_IN_RACK - 1;
-
 				node = uniform_int(min, max);
+
 				b->local_node.SetAt(node, &NODES[node]);//b->local_node[node] = &NODES[node];
 				rack = GET_RACK_FROM_NODE(node);
 				b->local_rack.SetAt(rack, 1);//b->local_rack[GET_RACK_FROM_NODE(node)] = 1;
 				++NODES[node].space.used;
 				++NODES[node].space.disk.used;
 				NODES[node].space.disk.blocks[b->id] = b;
-				RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
+				RACKS[rack].blocks[b->id] = 1;
 
 				for (j = 1; j < REPLICATION_FACTOR; ++j) {
 					node = node + CS_NODE_NUM;

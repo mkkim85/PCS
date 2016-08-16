@@ -5,6 +5,7 @@ long MAX_JOB_ID;
 double CHANGE_T, CUR_INT, NEXT_INT, CHG_PERIOD;
 CAtlMap<long, job_t*> JOB_MAP;
 CRBMap<long, CAtlList<long>*> P_QUEUE;
+long long FN[RACK_NUM];
 
 extern bool CSIM_END;
 extern CAtlArray<file_t*> FILE_VEC[MOD_FACTOR];
@@ -88,7 +89,7 @@ void workload(void)
 				while (job->map_total < maps) {
 					file = FILE_MAP[file_id];
 
-					for (long i = 0; i < file->blocks.GetCount(); i++) {
+					for (long i = 0; i < file->blocks.GetCount() && i < maps; i++) {
 						block_t *b = file->blocks[i];
 						POSITION pos = b->local_node.GetHeadPosition();
 						while (pos != NULL) {
@@ -161,6 +162,7 @@ void workload(void)
 						while (pos != NULL) {
 							long tn = b->local_node.GetKeyAt(pos);
 							long tr = GET_RACK_FROM_NODE(tn);
+							FN[tr]++;
 							if (job->map_splits[tr][tn].Lookup(b->id) == NULL) {
 								job->map_splits[tr][tn][b->id] = 1;
 							} 
