@@ -7,6 +7,7 @@ rack_map_t ACTIVE_RACK_NPG_SET, NPG_SET;
 extern facility *F_MASTER_SWITCH, *F_RACK_SWITCH[RACK_NUM];
 extern long REPORT_RACK_STATE_COUNT[STATE_LENGTH];
 extern long SETUP_MODE_TYPE;
+extern double SETUP_COMPUTATION_TIME, SETUP_RACK_POWER_RATIO, SETUP_RACK_SWITCH_SPEED;
 
 void init_rack(void)
 {
@@ -14,7 +15,7 @@ void init_rack(void)
 	long i;
 	rack_t *rack;
 
-	for (i = 0; i < RACK_NUM; ++i) {
+	for (i = 0; i < RACK_NUM; i++) {
 		rack = &RACKS[i];
 		rack->id = i;
 		rack->rank = 0;
@@ -39,13 +40,9 @@ void turnon_rack(long id)
 {
 	rack_t *rack = &RACKS[id];
 
-	if (rack->state == STATE_ACTIVE) {
-		return;
-	}
-
-	--REPORT_RACK_STATE_COUNT[rack->state];
+	--REPORT_RACK_STATE_COUNT[STATE_STANDBY];
 	rack->state = STATE_ACTIVE;
-	++REPORT_RACK_STATE_COUNT[rack->state];
+	++REPORT_RACK_STATE_COUNT[STATE_ACTIVE];
 	STANDBY_RACK_SET.RemoveKey(id);
 	ACTIVE_RACK_SET.SetAt(id, rack); //ACTIVE_RACK_SET[id] = rack;
 	ACTIVE_RACK_NPG_SET.SetAt(id, rack); //ACTIVE_RACK_NPG_SET[id] = rack;
@@ -57,11 +54,11 @@ void turnoff_rack(long id)
 
 	if (rack->state == STATE_STANDBY) {
 		return;
-	}
+	}	
 
-	--REPORT_RACK_STATE_COUNT[rack->state];
+	--REPORT_RACK_STATE_COUNT[STATE_ACTIVE];
 	rack->state = STATE_STANDBY;
-	++REPORT_RACK_STATE_COUNT[rack->state];
+	++REPORT_RACK_STATE_COUNT[STATE_STANDBY];
 	ACTIVE_RACK_SET.RemoveKey(id);
 	STANDBY_RACK_SET.SetAt(id, rack);//STANDBY_RACK_SET[id] = rack;
 	ACTIVE_RACK_NPG_SET.RemoveKey(id);
@@ -71,10 +68,10 @@ double switch_rack(long from, long to)
 {
 	double begin = clock;
 	if (from != to) {
-		F_RACK_SWITCH[from]->use(SWITCH_SPEED);
+		F_RACK_SWITCH[from]->use(SETUP_RACK_SWITCH_SPEED);
 		F_MASTER_SWITCH->use(MASTER_SPEED);
 	}
-	F_RACK_SWITCH[to]->use(SWITCH_SPEED);
+	F_RACK_SWITCH[to]->use(SETUP_RACK_SWITCH_SPEED);
 
 	return clock - begin;
 }
@@ -82,12 +79,19 @@ double switch_rack(long from, long to)
 double  switch_rack(long from, long to, double n)
 {	// For budget data transfer
 	double begin = clock;
-	double t = SWITCH_SPEED * n;
+	double t = SETUP_RACK_SWITCH_SPEED * n;
 	if (from != to) {
-		F_RACK_SWITCH[from]->use(t);
-		F_MASTER_SWITCH->use(MASTER_SPEED * n);
+		F_RACK_SWITCH[from]->reserve();
+		hold(t); //F_RACK_SWITCH[from]->use(t);
+		F_RACK_SWITCH[from]->release();
+		
+		F_MASTER_SWITCH->reserve();
+		hold(MASTER_SPEED * n); //F_MASTER_SWITCH->use(MASTER_SPEED * n);
+		F_MASTER_SWITCH->release();
 	}
-	F_RACK_SWITCH[to]->use(t);
+	F_RACK_SWITCH[to]->reserve();
+	hold(t); //F_RACK_SWITCH[to]->use(t);
+	F_RACK_SWITCH[to]->release();
 
 	return clock - begin;
 }

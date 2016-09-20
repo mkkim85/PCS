@@ -31,6 +31,7 @@ struct storage_t
 		long capacity;
 		long used;
 		CAtlMap<long, void*> blocks;
+		CAtlList<long> lru_cache;
 	} budget;
 };
 

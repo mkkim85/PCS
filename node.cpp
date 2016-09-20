@@ -19,7 +19,6 @@ extern node_map_t HEARTBEAT;
 extern bool MANAGER_CS[NODE_NUM];
 extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
 extern CAtlMap<long, CAtlMap<long, CAtlList<long>>> MANAGER_BUDGET_MAP;
-//extern CAtlMap<long, CAtlMap<long, long>> MANAGER_LOCAL_MAP;
 extern long_map_t UPSET, DOWNSET;
 extern long REPORT_BUDGET_SIZE;
 extern long SETUP_NODE_UPTIME;
@@ -43,10 +42,11 @@ void init_node(void)
 		pnode->space.used = 0;
 		pnode->space.budget.capacity = ceil((BLOCK_MAP.GetCount() / CS_NODE_NUM) * SETUP_BUDGET_RATIO); 
 		pnode->space.budget.used = 0;
+		pnode->space.budget.lru_cache.RemoveAll();
 		pnode->space.disk.capacity = DISK_SIZE - pnode->space.budget.capacity;
-		pnode->space.disk.used = 0;
-		pnode->space.disk.blocks.RemoveAll();
-		pnode->space.budget.blocks.RemoveAll();
+		//pnode->space.disk.used = 0;
+		//pnode->space.disk.blocks.RemoveAll();
+		//pnode->space.budget.blocks.RemoveAll();
 
 		sprintf(str, "nMail%ld", i);
 		M_NODE[i] = new mailbox(str);
@@ -102,7 +102,7 @@ void node(long id)
 	long group = GET_G_FROM_RACK(rack);
 	node_t *my = &NODES[id];
 	rack_t *parent = &RACKS[rack];
-	
+
 	sprintf(str, "node%ld", id);
 	create(str);
 	while (true) {
@@ -113,18 +113,10 @@ void node(long id)
 			if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) 
 				&& MANAGER_BUDGET_MAP.Lookup(id) != NULL) {
 				POSITION pos = MANAGER_BUDGET_MAP[id].GetStartPosition();
-				
+
 				while (pos != NULL) {
 					CAtlMap<long, CAtlList<long>>::CPair *pair = MANAGER_BUDGET_MAP[id].GetAt(pos);
 					if (SETUP_MODE_TYPE == MODE_PCSC) {
-						/*if (MANAGER_LOCAL_MAP.Lookup(id) != NULL) {
-							CAtlMap<long, long> *m = &MANAGER_LOCAL_MAP[id];
-							for (POSITION pos2 = m->GetStartPosition();
-								pos2 != NULL; m->GetNext(pos2)) {
-								CAtlMap<long, long>::CPair *pa = m->GetAt(pos2);
-								node_cpu(pair->m_key, (double)COMP_T * pa->m_value);
-							}
-						}*/
 						for (POSITION pos = pair->m_value.GetHeadPosition();
 							pos != NULL; pair->m_value.GetNext(pos)) {
 							block_t *b = GetBlock(pair->m_value.GetAt(pos));
@@ -167,6 +159,7 @@ void node(long id)
 						else {
 							b->local_rack.SetAt(rack, b->local_rack.Lookup(rack)->m_value + 1); //++b->local_rack[rack];
 						}
+						bblock_add(id, b->id);
 						BUDGET_MAP[b->id][id] = 1;
 						++REPORT_BUDGET_SIZE;
 					}
@@ -217,6 +210,7 @@ void node(long id)
 						parent->blocks.RemoveKey(b->id);
 					}
 					BUDGET_MAP[b->id].RemoveKey(id);
+					bblock_del(id, b->id);
 					if (BUDGET_MAP[b->id].IsEmpty()) {
 						BUDGET_MAP.RemoveKey(b->id);
 					}
@@ -224,6 +218,7 @@ void node(long id)
 					my->space.budget.blocks.GetNext(pos);
 				}
 				my->space.budget.blocks.RemoveAll();
+				my->space.budget.lru_cache.RemoveAll();
 			}
 			my->space.used = my->space.used - my->space.budget.used;
 			my->space.budget.used = 0;
@@ -273,7 +268,9 @@ void mem_caching(long nid, long bid)
 		if (mem->Find(bid) != NULL) {
 			mem->RemoveAt(mem->Find(bid));
 		}
-		else {			mem->RemoveTailNoReturn();		}
+		else {
+			mem->RemoveTailNoReturn();
+		}
 	}
 	MEMORY[nid].AddHead(bid);
 }
@@ -296,4 +293,54 @@ void node_disk(long id, long n)
 	double btime = clock;
 	double t = DISK_SPEED * n;
 	FM_DISK[id]->use(t);
+}
+
+void bblock_use(long nid, long bid)
+{
+	CAtlList<long> *budget = &NODES[nid].space.budget.lru_cache;
+	POSITION pos = budget->Find(bid);
+	if (pos != NULL) {
+		budget->RemoveAt(pos);
+	}
+	budget->AddHead(bid);
+}
+
+void bblock_add(long nid, long bid)
+{
+	storage_t *space = &NODES[nid].space;
+	CAtlList<long> *budget = &space->budget.lru_cache;
+	POSITION pos = budget->Find(bid);
+	if (pos != NULL) {
+		budget->RemoveAt(pos);
+	}
+	else {
+		if (space->budget.capacity <= budget->GetCount()) {
+			block_t *b = GetBlock(space->budget.lru_cache.RemoveTail());
+			long rack = GET_RACK_FROM_NODE(nid);
+			rack_t *parent = &RACKS[rack];
+			if (b->local_rack.Lookup(rack) != NULL &&
+				--b->local_rack.Lookup(rack)->m_value == 0) {//if (--b->local_rack[rack] == 0) {
+				b->local_rack.RemoveKey(rack);
+			}
+			if (--parent->blocks[b->id] == 0) {
+				parent->blocks.RemoveKey(b->id);
+			}
+			BUDGET_MAP[b->id].RemoveKey(nid);
+			bblock_del(nid, b->id);
+			if (BUDGET_MAP[b->id].IsEmpty()) {
+				BUDGET_MAP.RemoveKey(b->id);
+			}
+			--REPORT_BUDGET_SIZE;
+		}
+	}
+	budget->AddHead(bid);
+}
+
+void bblock_del(long nid, long bid)
+{
+	CAtlList<long> *budget = &NODES[nid].space.budget.lru_cache;
+	POSITION pos = budget->Find(bid);
+	if (pos != NULL) {
+		budget->RemoveAt(pos);
+	}
 }

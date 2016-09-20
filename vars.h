@@ -1,12 +1,11 @@
 // simulation parameters
 //#define REPLICA_LIMIT			INT_MAX		//INT_MAX
 //#define RAND_LAYOUT				false
-#define FB_WORKLOAD				false
+#define FB_WORKLOAD				true
 #define FB_PATH					"files/workload.txt"
 #define FB_DATA_PATH			"files/data.txt"
-#define FB_LOAD_RATIO			0.5
 #define REPLICATION_FACTOR		3
-#define MAP_COMPUTATION_TIME	100.0
+//#define MAP_COMPUTATION_TIME	30.0
 #define JOB_MAP_TASK_NUM		64
 #define DATA_BLOCK_NUM			(160 * 1024)		// 160n, 10TB
 #define TIME_UNIT				1.0
@@ -38,9 +37,8 @@
 #define RACK_NUM				(long)(CS_RACK_NUM * REPLICATION_FACTOR)
 #define NODE_NUM_IN_RACK		(long)(NODE_NUM / RACK_NUM)
 #define SWTICH_NUM				(long)(NODE_NUM_IN_RACK)
-#define RACK_POWER				2.4 * 1			// 2.4 kW
-#define SWITCH_DELAY			0.1			// 10 Gbps, 1% overhead
-#define SWITCH_SPEED			0.05		// 0.05 s/block, 10 Gbps, 1.25 GB/s
+//#define RACK_POWER				(4.8 * 0.5)	// default 50% = 2.4 kW
+//#define SWITCH_SPEED			0.05		// 0.05 s/block, 10 Gbps, 1.25 GB/s
 #define MASTER_SPEED			0.05
 
 // setup

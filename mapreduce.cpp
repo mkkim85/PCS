@@ -15,6 +15,7 @@ extern long REPORT_NODE_STATE_COUNT[STATE_LENGTH];
 extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
 extern table *T_LOCALITY[LOCAL_LENGTH];
 extern long SETUP_MODE_TYPE;
+extern double SETUP_COMPUTATION_TIME;
 extern bool MANAGER_CS[NODE_NUM];
 extern long REPORT_NODE_STATE_COUNT_PG[STATE_LENGTH];
 extern double REPORT_RESP_T_TOTAL, REPORT_Q_DELAY_T_TOTAL;
@@ -127,7 +128,9 @@ void mapper(long id)
 
 		file = FILE_MAP[block->file_id];
 		long psiz = file->acc.GetCount();
-		++file->acc[job->id];
+		if (file->acc.Lookup(job->id) == NULL)
+			file->acc[job->id] = 1;
+		else ++file->acc[job->id];
 		long csiz = file->acc.GetCount();
 		if ((SETUP_MODE_TYPE == MODE_IPACS || SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC)
 			&& csiz > 1 && psiz != csiz) {
@@ -138,7 +141,12 @@ void mapper(long id)
 
 		if (SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) {
 			if (BUDGET_MAP.Lookup(block->id) != NULL) {
-				if (BUDGET_MAP[block->id].Lookup(node) != NULL) {
+				if ((BUDGET_MAP[block->id].Lookup(node) != NULL 
+					&& r->task.locality == LOCAL_NODE)
+					|| (r->task.locality == LOCAL_RACK 
+						&& BUDGET_MAP[block->id].Lookup(r->task.local_node) != NULL
+						&& GET_RACK_FROM_NODE(r->task.local_node) == GET_RACK_FROM_NODE(node))) {
+					bblock_use(r->task.local_node, block->id);
 					++REPORT_BUDGET_HIT;
 				}
 			}
@@ -175,13 +183,13 @@ void mapper(long id)
 		mem_caching(node, block->id);
 
 		bcpu = clock;
-		node_cpu(node, MAP_COMPUTATION_TIME);
+		node_cpu(node, SETUP_COMPUTATION_TIME);
 		cpu_t = abs(clock - bcpu);
 		T_TASK_TIMES[O_CPU]->record(cpu_t);
 		REPORT_CPU_T.first += cpu_t;
 		REPORT_CPU_T.second++;
 
-		if (--file->acc[job->id] <= 0) {
+		if (file->acc.Lookup(job->id) != NULL && --file->acc[job->id] <= 0) {
 			file->acc.RemoveKey(job->id);
 		}
 		MAPPER[id].used = false;

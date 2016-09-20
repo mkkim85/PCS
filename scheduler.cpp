@@ -20,7 +20,7 @@ msg_t * scheduler(long node)
 	CAtlList<long> *queue = NULL;
 	POSITION pos = NULL, pos2 = NULL;
 
-	for (i = 0; i < MAP_SLOTS; ++i) {
+	for (i = 0; i < MAP_SLOTS; i++) {
 		if (nptr->mapper.slot[i]->used == false) {
 			slotid = nptr->mapper.slot[i]->id;
 			break;
