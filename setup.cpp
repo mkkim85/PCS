@@ -48,7 +48,7 @@ void setup(void)
 			SETUP_MODE_TYPE,
 			SETUP_LIMIT_K,
 			(SETUP_TIME_WINDOW / MINUTE),
-			(JOB_MAP_TASK_NUM / SETUP_FILE_SIZE),
+			(SETUP_FILE_SIZE / JOB_MAP_TASK_NUM),
 			SETUP_DATA_LAYOUT,
 			SETUP_DATA_SKEW,
 			SETUP_BUDGET_RATIO,
@@ -68,7 +68,7 @@ void setup(void)
 			SETUP_MODE_TYPE,
 			SETUP_LIMIT_K,
 			(SETUP_TIME_WINDOW / MINUTE),
-			(JOB_MAP_TASK_NUM / SETUP_FILE_SIZE),
+			(SETUP_FILE_SIZE / JOB_MAP_TASK_NUM),
 			SETUP_DATA_LAYOUT,
 			SETUP_DATA_SKEW,
 			SETUP_BUDGET_RATIO,
@@ -92,8 +92,8 @@ void setup(void)
 	}
 	delete stat_buf;
 
-	sprintf(str, "_report\\%s.txt", path);
-	SETUP_SIM_OUTPUT = fopen(str, "w");
+	//sprintf(str, "_report\\%s.txt", path);
+	//SETUP_SIM_OUTPUT = fopen(str, "w");
 	sprintf(str, "_report\\%s.csv", path);
 	strcpy(SETUP_REPORT_PATH, str);
 	SETUP_REPORT_FILE = fopen(str, "w");

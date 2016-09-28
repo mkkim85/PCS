@@ -30,6 +30,7 @@ void sim_report(void)
 	fclose(SETUP_REPORT_FILE);
 
 	create("report");
+	
 	while (!CSIM_END) {
 		t = clock;
 
@@ -47,10 +48,12 @@ void sim_report(void)
 			+ (REPORT_NODE_STATE_COUNT[STATE_DEACTIVATE] * (NODE_D_POWER / HOUR))
 			+ ((REPORT_NODE_STATE_COUNT[STATE_ACTIVE] - CS_NODE_NUM) * (NODE_A_POWER / HOUR));
 
-		REPORT_NODE.first += ACTIVE_NODE_SET.GetCount();
+		//REPORT_NODE.first += ACTIVE_NODE_SET.GetCount();
+		REPORT_NODE.first += REPORT_NODE_STATE_COUNT[STATE_ACTIVE];;
 		REPORT_NODE.second++;
 
-		REPORT_RACK.first += ACTIVE_RACK_SET.GetCount();
+		//REPORT_RACK.first += ACTIVE_RACK_SET.GetCount();
+		REPORT_RACK.first += REPORT_RACK_STATE_COUNT[STATE_ACTIVE];
 		REPORT_RACK.second++;
 
 		if (t > 0 && (t % hold_t) == 0) {

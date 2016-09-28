@@ -62,9 +62,20 @@ void state_manager(void)
 	long_map_t *bag = NULL;
 
 	create("state manager");
+
 	while (!CSIM_END) {
-		if (stable == false && UPSET.IsEmpty() && DOWNSET.IsEmpty())
+		if (stable == false && UPSET.IsEmpty() && DOWNSET.IsEmpty() && MANAGER_BUDGET_MAP.IsEmpty())
 			stable = true;
+
+		if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC)
+			&& stable == false && MANAGER_BUDGET_MAP.IsEmpty() && !DOWNSET.IsEmpty()) {
+			for (POSITION pos = DOWNSET.GetStartPosition(); pos != NULL; DOWNSET.GetNext(pos)) {
+				long i = DOWNSET.GetKeyAt(pos);
+				msg_t *msg = new msg_t;
+				msg->power = false;
+				M_NODE[i]->send((long)msg);
+			}
+		}
 
 		if (INCOMPLETE_MAP_TASKS_Q.GetCount() >= SETUP_TIME_WINDOW) {
 			m_total -= INCOMPLETE_MAP_TASKS_Q.RemoveHead();
@@ -154,22 +165,19 @@ long_map_t* FindSierra(bool cs[], long top_k, long req_m)
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
 
 	for (g = 1; g < REPLICATION_FACTOR; ++g) {
-		node_map_t S;
+		CAtlArray<long> S;
 		S.RemoveAll();
 		for (node = CS_NODE_NUM * g; node < CS_NODE_NUM * (g + 1); ++node) {
-			S.SetAt(node, &NODES[node]);//S[node] = &NODES[node];
+			S.Add(node);
 		}
 		while (req_m > 0 && S.GetCount() > 0) {
-			POSITION pos = S.GetHeadPosition();
 			long i = uniform_int(0, S.GetCount() - 1);
-			while (i--)
-				S.GetNext(pos);
-			node = S.GetKeyAt(pos);
+			node = S[i];
 			if (MANAGER_CS[node] == false) {
 				MANAGER_CS[node] = true;
 				req_m = req_m - MAP_SLOTS;
 			}
-			S.RemoveAt(pos);
+			S.RemoveAt(i);
 		}
 	}
 
@@ -227,7 +235,8 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 	memset(&MANAGER_CS, true, sizeof(bool) * CS_NODE_NUM);
 	memset(&MANAGER_CS_RACKS, false, sizeof(bool) * RACK_NUM);
 	memset(&MANAGER_CS_RACKS, true, sizeof(bool) * CS_RACK_NUM);
-	
+	MANAGER_CS_NODES.RemoveAll();
+
 	while ((req_m > 0 || !bag->IsEmpty()) && !F.IsEmpty()) {
 		if (!bag->IsEmpty()) {
 			if (sorted == false) {
@@ -262,60 +271,62 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 		while (nid < nend) {
 			node = &NODES[nid];
 			if (MANAGER_CS[node->id] == false) {
-				//CAtlList<long> rk;
+				CAtlList<long> rk;
 				MANAGER_CS_NODES.SetAt(node->id, node);//MANAGER_CS_NODES[node->id] = node;
 				MANAGER_CS[node->id] = true;
 				req_m = req_m - MAP_SLOTS;
 
 				// Invalidate replicas of n's storage budget that are not appeared in bag;
 				POSITION bpos = node->space.budget.blocks.GetStartPosition();
-				//while (bpos != NULL) {
-				//	CAtlMap<long, void*>::CPair *pair = node->space.budget.blocks.GetAt(bpos);
-				//	block_t *b = (block_t*)pair->m_value;
-				//	if (bag->Lookup(b->id) == NULL) {
-				//		b->local_node.RemoveKey(node->id);
-				//		b->local_rack.RemoveKey(GET_RACK_FROM_NODE(node->id));
-				//		rk.AddTail(node->space.budget.blocks.GetKeyAt(bpos));
-				//		--node->space.used;
-				//		--node->space.budget.used;
-				//		
-				//		BUDGET_MAP[b->id].RemoveKey(node->id);
-				//		if (BUDGET_MAP[b->id].IsEmpty()) {
-				//			BUDGET_MAP.RemoveKey(b->id);
-				//		}
-				//		--REPORT_BUDGET_SIZE;
-				//	}
-				//	node->space.budget.blocks.GetNext(bpos);
-				//}
-
-				//// remove
-				//for (POSITION p = rk.GetHeadPosition(); p != NULL; rk.GetNext(p))
-				//	node->space.budget.blocks.RemoveKey(rk.GetAt(p));
-
-				// B = B - n.getBlockList();
-				POSITION dpos = node->space.disk.blocks.GetStartPosition();
-				while (dpos != NULL) {	// disk
-					block_t *b = (block_t*)node->space.disk.blocks.GetValueAt(dpos);
-					if (bag->Lookup(b->id) != NULL) {
-						if (--(*bag)[b->id] == 0) {
-							bag->RemoveKey(b->id);
+				while (bpos != NULL) {
+					CAtlMap<long, void*>::CPair *pair = node->space.budget.blocks.GetAt(bpos);
+					block_t *b = (block_t*)pair->m_value;
+					if (bag->Lookup(b->id) == NULL) {
+						b->local_node.RemoveKey(node->id);
+						b->local_rack.RemoveKey(GET_RACK_FROM_NODE(node->id));
+						rk.AddTail(node->space.budget.blocks.GetKeyAt(bpos));
+						--node->space.used;
+						--node->space.budget.used;
+						
+						BUDGET_MAP[b->id].RemoveKey(node->id);
+						if (BUDGET_MAP[b->id].IsEmpty()) {
+							BUDGET_MAP.RemoveKey(b->id);
 						}
-						--bag_size;
-					}
-					node->space.disk.blocks.GetNext(dpos);
-				}
-
-				bpos = node->space.budget.blocks.GetStartPosition();
-				while (bpos != NULL) {	// budget
-					block_t *b = (block_t*)node->space.budget.blocks.GetValueAt(bpos);
-					if (bag->Lookup(b->id) != NULL) {
-						if (--(*bag)[b->id] == 0) {
-							bag->RemoveKey(b->id);
-						}
-						--bag_size;
+						--REPORT_BUDGET_SIZE;
 					}
 					node->space.budget.blocks.GetNext(bpos);
 				}
+
+				// remove
+				for (POSITION p = rk.GetHeadPosition(); p != NULL; rk.GetNext(p))
+					node->space.budget.blocks.RemoveKey(rk.GetAt(p));
+
+				// B = B - n.getBlockList();
+				//if (node->state == STATE_STANDBY) {
+					POSITION dpos = node->space.disk.blocks.GetStartPosition();
+					while (dpos != NULL) {	// disk
+						block_t *b = (block_t*)node->space.disk.blocks.GetValueAt(dpos);
+						if (bag->Lookup(b->id) != NULL) {
+							if (--(*bag)[b->id] == 0) {
+								bag->RemoveKey(b->id);
+							}
+							--bag_size;
+						}
+						node->space.disk.blocks.GetNext(dpos);
+					}
+
+					POSITION bpos2 = node->space.budget.blocks.GetStartPosition();
+					while (bpos2 != NULL) {	// budget
+						block_t *b = (block_t*)node->space.budget.blocks.GetValueAt(bpos2);
+						if (bag->Lookup(b->id) != NULL) {
+							if (--(*bag)[b->id] == 0) {
+								bag->RemoveKey(b->id);
+							}
+							--bag_size;
+						}
+						node->space.budget.blocks.GetNext(bpos2);
+					}
+				//}
 
 				//budget_size = budget_size + (node->space.budget.capacity - node->space.budget.used);
 				budget_size = budget_size + node->space.budget.capacity;
@@ -357,56 +368,58 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 				node = &NODES[node->id + 1];
 				MANAGER_CS_NODES.SetAt(node->id, node);//MANAGER_CS_NODES[node->id] = node;
 				MANAGER_CS[node->id] = true;
-				//POSITION pos = node->space.budget.blocks.GetStartPosition();
-				//while (pos != NULL) {
-				//	block_t *b = (block_t*)node->space.budget.blocks.GetValueAt(pos);
-				//	if (bag->Lookup(b->id) == NULL) {
-				//		b->local_node.RemoveKey(node->id);
-				//		b->local_rack.RemoveKey(GET_RACK_FROM_NODE(node->id));
-				//		rk.AddTail(node->space.budget.blocks.GetKeyAt(pos));
-				//		node->space.budget.blocks.GetNext(pos);
-				//		--node->space.used;
-				//		--node->space.budget.used;
-
-				//		BUDGET_MAP[b->id].RemoveKey(node->id);
-				//		if (BUDGET_MAP[b->id].IsEmpty()) {
-				//			BUDGET_MAP.RemoveKey(b->id);
-				//		}
-				//		--REPORT_BUDGET_SIZE;
-				//	}
-				//	else {
-				//		node->space.budget.blocks.GetNext(pos);
-				//	}
-				//}
-				//
-				//// remove
-				//for (POSITION p = rk.GetHeadPosition(); p != NULL; rk.GetNext(p))
-				//	node->space.budget.blocks.RemoveKey(rk.GetAt(p));
-
-				POSITION pos = node->space.disk.blocks.GetStartPosition();
-				while (pos != NULL) {	// disk
-					block_t *b = (block_t*)node->space.disk.blocks.GetValueAt(pos);
-					if (bag->Lookup(b->id) != NULL) {
-						if (--(*bag)[b->id] == 0) {
-							bag->RemoveKey(b->id);
-						}
-						--listSize;
-					}
-					node->space.disk.blocks.GetNext(pos);
-				}
-				pos = node->space.budget.blocks.GetStartPosition();
-				while (pos != NULL) {	// budget
+				POSITION pos = node->space.budget.blocks.GetStartPosition();
+				while (pos != NULL) {
 					block_t *b = (block_t*)node->space.budget.blocks.GetValueAt(pos);
-					if (bag->Lookup(b->id) != NULL) {
-						if (--(*bag)[b->id] == 0) {
-							bag->RemoveKey(b->id);
+					if (bag->Lookup(b->id) == NULL) {
+						b->local_node.RemoveKey(node->id);
+						b->local_rack.RemoveKey(GET_RACK_FROM_NODE(node->id));
+						rk.AddTail(node->space.budget.blocks.GetKeyAt(pos));
+						node->space.budget.blocks.GetNext(pos);
+						--node->space.used;
+						--node->space.budget.used;
+
+						BUDGET_MAP[b->id].RemoveKey(node->id);
+						if (BUDGET_MAP[b->id].IsEmpty()) {
+							BUDGET_MAP.RemoveKey(b->id);
 						}
-						--listSize;
+						--REPORT_BUDGET_SIZE;
 					}
-					node->space.budget.blocks.GetNext(pos);
+					else {
+						node->space.budget.blocks.GetNext(pos);
+					}
 				}
-				//sBudgetSize = sBudgetSize + (node->space.budget.capacity - node->space.budget.used);
-				sBudgetSize = sBudgetSize + node->space.budget.capacity;
+				
+				// remove
+				for (POSITION p = rk.GetHeadPosition(); p != NULL; rk.GetNext(p))
+					node->space.budget.blocks.RemoveKey(rk.GetAt(p));
+
+				//if (node->state == STATE_STANDBY) {
+					POSITION pos2 = node->space.disk.blocks.GetStartPosition();
+					while (pos2 != NULL) {	// disk
+						block_t *b = (block_t*)node->space.disk.blocks.GetValueAt(pos2);
+						if (bag->Lookup(b->id) != NULL) {
+							if (--(*bag)[b->id] == 0) {
+								bag->RemoveKey(b->id);
+							}
+							--listSize;
+						}
+						node->space.disk.blocks.GetNext(pos2);
+					}
+					pos2 = node->space.budget.blocks.GetStartPosition();
+					while (pos2 != NULL) {	// budget
+						block_t *b = (block_t*)node->space.budget.blocks.GetValueAt(pos2);
+						if (bag->Lookup(b->id) != NULL) {
+							if (--(*bag)[b->id] == 0) {
+								bag->RemoveKey(b->id);
+							}
+							--listSize;
+						}
+						node->space.budget.blocks.GetNext(pos2);
+					}
+				//}
+				sBudgetSize = sBudgetSize + (node->space.budget.capacity - node->space.budget.used);
+				//sBudgetSize = sBudgetSize + node->space.budget.capacity;
 			}
 		}
 
@@ -416,16 +429,54 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 		long_map_t nb;
 		while (pos != NULL) {
 			node_t *node = MANAGER_CS_NODES.GetValueAt(pos);
-			//long nBudgetSize = node->space.budget.capacity - node->space.budget.used;
-			long nBudgetSize = node->space.budget.capacity;
+			long nBudgetSize = node->space.budget.capacity - node->space.budget.used;
+			//long nBudgetSize = node->space.budget.capacity;
 			nb[node->id] = ceil(((double)nBudgetSize / sBudgetSize) * listSize);
+		
+			CAtlArray<long> proj;
+			long rack_id = GET_RACK_FROM_NODE(node->id);
+			// B ¡û i.getBlockList() - n.getBlockList()
+			for (POSITION pos2 = bag->GetStartPosition(); pos2 != NULL; bag->GetNext(pos2)) {
+				long block_id = bag->GetKeyAt(pos2);
+				if (RACKS[rack_id].blocks.Lookup(block_id) != NULL
+					&& node->space.disk.blocks.Lookup(block_id) == NULL
+					&& node->space.budget.blocks.Lookup(block_id) == NULL)
+					proj.Add(block_id);
+			}
+
+			if (proj.GetCount() < nb[node->id]) {
+				for (long i = 0; i < proj.GetCount(); i++) {
+					long block_id = proj[i];
+					MANAGER_BUDGET_MAP[node->id][rack_id].AddTail(block_id);
+					if (--(*bag)[block_id] == 0) {
+						bag->RemoveKey(block_id);
+					}
+				}
+				nb[node->id] = nb[node->id] - proj.GetCount();
+				proj.RemoveAll();
+			}
+			else {
+				// transfer
+				long i = nb[node->id];
+				while (i--) {
+					long ran = uniform_int(0, proj.GetCount() - 1);
+					long block_id = proj[ran];
+					MANAGER_BUDGET_MAP[node->id][rack_id].AddTail(block_id);
+					if (--(*bag)[block_id] == 0) {
+						bag->RemoveKey(block_id);
+					}
+					proj.RemoveAt(ran);
+				}
+				nb[node->id] = 0;
+				proj.RemoveAll();
+			}
 
 			MANAGER_CS_NODES.GetNext(pos);
 		}
 
 		pos = MANAGER_CS_NODES.GetHeadPosition();
-		long iterNum = listSize;
-		//long iterNum = bag->GetCount();
+		//long iterNum = listSize;
+		long iterNum = MIN(bag->GetCount(), 10000);
 		while (pos != NULL) {
 			// transfer nb blocks of B from any source nodes to n
 			// B = B - list of transferred blocks
@@ -469,24 +520,52 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 			MANAGER_CS_NODES.GetNext(pos);
 		}
 	}
-
-	for (i = CS_NODE_NUM; i < NODE_NUM; ++i)
-	{
-		if (MANAGER_CS[i] == true) {	// turn on nodes
-			if (NODES[i].state == STATE_STANDBY) {
-				//printf("%ld) %ld\n", (long)clock, GET_RACK_FROM_NODE(i));
-				msg = new msg_t;
-				msg->power.power = true;
-				M_NODE[i]->synchronous_send((long)msg);
-				UPSET[i] = 1;
+	
+	if (SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) {
+		for (i = CS_NODE_NUM; i < NODE_NUM; ++i)
+		{
+			if (MANAGER_CS[i] == true) {	// turn on nodes
+				if (NODES[i].state == STATE_STANDBY) {
+					//printf("%ld) %ld\n", (long)clock, GET_RACK_FROM_NODE(i));
+					msg = new msg_t;
+					msg->power = true;
+					M_NODE[i]->send((long)msg);
+					UPSET[i] = 1;
+				}
+				else if (MANAGER_BUDGET_MAP.Lookup(i) != NULL) {
+					// transfer budget blocks to already activated nodes
+					transfer_blocks_to_budget(i);
+				}
+			}
+			else {	// turn off nodes
+				if (NODES[i].state == STATE_ACTIVE) {
+					//msg = new msg_t;
+					//msg->power.power = false;
+					//M_NODE[i]->synchronous_send((long)msg);
+					DOWNSET[i] = 1;
+				}
 			}
 		}
-		else {	// turn off nodes
-			if (NODES[i].state == STATE_ACTIVE) {
-				msg = new msg_t;
-				msg->power.power = false;
-				M_NODE[i]->synchronous_send((long)msg);
-				DOWNSET[i] = 1;
+	}
+	else {
+		for (i = CS_NODE_NUM; i < NODE_NUM; ++i)
+		{
+			if (MANAGER_CS[i] == true) {	// turn on nodes
+				if (NODES[i].state == STATE_STANDBY) {
+					//printf("%ld) %ld\n", (long)clock, GET_RACK_FROM_NODE(i));
+					msg = new msg_t;
+					msg->power = true;
+					M_NODE[i]->send((long)msg);
+					UPSET[i] = 1;
+				}
+			}
+			else {	// turn off nodes
+				if (NODES[i].state == STATE_ACTIVE) {
+					msg = new msg_t;
+					msg->power = false;
+					M_NODE[i]->send((long)msg);
+					DOWNSET[i] = 1;
+				}
 			}
 		}
 	}

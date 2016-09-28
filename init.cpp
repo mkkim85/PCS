@@ -1,9 +1,9 @@
 #include "header.h"
 
 extern facility *F_MASTER_SWITCH;
-extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
-extern table *T_LOCALITY[LOCAL_LENGTH];
-extern table *T_CACHE_HIT, *T_CACHE_MISS;
+//extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
+//extern table *T_LOCALITY[LOCAL_LENGTH];
+//extern table *T_CACHE_HIT, *T_CACHE_MISS;
 extern long SETUP_RANDOM_SEED;
 extern FILE *SETUP_SIM_OUTPUT;
 
@@ -13,7 +13,7 @@ void init(void)
 	long i;
 	
 	reset_prob(SETUP_RANDOM_SEED);
-	set_output_file(SETUP_SIM_OUTPUT);
+	//set_output_file(SETUP_SIM_OUTPUT);
 
 	i = max_processes(MAX_PROCESSES);
 	i = max_facilities(MAX_FACILITIES);
@@ -31,9 +31,7 @@ void init(void)
 	F_MASTER_SWITCH = new facility(str);
 	//F_MASTER_SWITCH->set_servicefunc(inf_srv);
 
-	extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
-
-	T_TURNAROUND_TIME = new table("turnaround time");
+	/*T_TURNAROUND_TIME = new table("turnaround time");
 	T_QDELAY_TIME = new table("qdelay time");
 	T_TASK_TIMES[O_CPU] = new table("overhead: cpu");
 	T_TASK_TIMES[O_MEMORY] = new table("overhead: memory");
@@ -46,5 +44,5 @@ void init(void)
 	T_LOCALITY[LOCAL_REMOTE] = new table ("locality: remote");
 
 	T_CACHE_HIT = new table("cache hit");
-	T_CACHE_MISS = new table("cache miss");
+	T_CACHE_MISS = new table("cache miss");*/
 }

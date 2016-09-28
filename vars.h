@@ -1,13 +1,13 @@
 // simulation parameters
 //#define REPLICA_LIMIT			INT_MAX		//INT_MAX
 //#define RAND_LAYOUT				false
-#define FB_WORKLOAD				true
+#define FB_WORKLOAD				false
 #define FB_PATH					"files/workload.txt"
 #define FB_DATA_PATH			"files/data.txt"
 #define REPLICATION_FACTOR		3
 //#define MAP_COMPUTATION_TIME	30.0
 #define JOB_MAP_TASK_NUM		64
-#define DATA_BLOCK_NUM			(160 * 1024)		// 160n, 10TB
+#define DATA_BLOCK_NUM			(163840 * 3)		// n * 10 TB (160 * 1024)
 #define TIME_UNIT				1.0
 #define MINUTE					60
 #define HOUR					(60 * MINUTE)
@@ -42,7 +42,7 @@
 #define MASTER_SPEED			0.05
 
 // setup
-#define MAX_PROCESSES			(NODE_NUM + MAP_SLOTS_MAX + 7)
+#define MAX_PROCESSES			((NODE_NUM - CS_NODE_NUM) + NODE_NUM + MAP_SLOTS_MAX + 7)
 #define MAX_FACILITIES			((NODE_NUM * 3) + RACK_NUM + 1)
 #define MAX_SERVERS				((NODE_NUM * 3) + (NODE_NUM * CPU_CORE) + (NODE_NUM * DISK_NUM) + (RACK_NUM * SWTICH_NUM) + 1)
 #define MAX_MAILBOXES			(NODE_NUM + MAP_SLOTS_MAX)
@@ -69,3 +69,5 @@
 
 #define FILE_NUM				(DATA_BLOCK_NUM / JOB_MAP_TASK_NUM)
 #define MOD_FACTOR				CS_RACK_NUM
+
+#define MAX_USERS				(9600 / JOB_MAP_TASK_NUM)

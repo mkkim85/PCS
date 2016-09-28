@@ -2,8 +2,9 @@
 
 node_map_t HEARTBEAT;
 
+extern long USER_COUNT;
 extern CAtlMap<long, job_t*> JOB_MAP;
-extern CAtlMap<long, CAtlList<std::pair<double, long>>> FILE_HISTORY;
+extern CAtlMap<long, CAtlMap<double, long>> FILE_HISTORY;
 extern node_t NODES[NODE_NUM];
 extern slot_t MAPPER[MAP_SLOTS_MAX];
 extern long REMAIN_MAP_TASKS, REPORT_BUDGET_HIT;
@@ -12,8 +13,8 @@ extern bool CSIM_END;
 //extern CAtlList<job_t*> MAP_QUEUE;
 extern CAtlMap<long, file_t*> FILE_MAP;
 extern long REPORT_NODE_STATE_COUNT[STATE_LENGTH];
-extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
-extern table *T_LOCALITY[LOCAL_LENGTH];
+//extern table *T_TURNAROUND_TIME, *T_QDELAY_TIME, *T_TASK_TIMES[O_LENGTH];
+//extern table *T_LOCALITY[LOCAL_LENGTH];
 extern long SETUP_MODE_TYPE;
 extern double SETUP_COMPUTATION_TIME;
 extern bool MANAGER_CS[NODE_NUM];
@@ -33,6 +34,7 @@ void job_tracker(void)
 	CAtlArray<node_t*> heartbeat;
 
 	create("job_tracker");
+	
 	while (!CSIM_END) {
 		//	node_map_t heartbeat, reuse;
 		heartbeat.RemoveAll();
@@ -78,6 +80,7 @@ void mapper(long id)
 
 	sprintf(str, "mapper%ld", id);
 	create(str);
+	
 	while (true) {
 		M_MAPPER[id]->receive((long*)&r);
 		btask = task_t = bcpu = cpu_t = bmem = mem_t = bdisk = disk_t = q_t = net_t = 0;
@@ -134,7 +137,8 @@ void mapper(long id)
 		long csiz = file->acc.GetCount();
 		if ((SETUP_MODE_TYPE == MODE_IPACS || SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC)
 			&& csiz > 1 && psiz != csiz) {
-			FILE_HISTORY[file->id].AddTail(std::pair<double, long>(clock, csiz));
+			FILE_HISTORY[file->id].SetAt(clock, csiz);
+			//FILE_HISTORY[file->id].AddTail(std::pair<double, long>(clock, csiz));
 		}
 		++parent->mapper.used;
 		MAPPER[id].used = true;
@@ -146,7 +150,7 @@ void mapper(long id)
 					|| (r->task.locality == LOCAL_RACK 
 						&& BUDGET_MAP[block->id].Lookup(r->task.local_node) != NULL
 						&& GET_RACK_FROM_NODE(r->task.local_node) == GET_RACK_FROM_NODE(node))) {
-					bblock_use(r->task.local_node, block->id);
+//					bblock_use(r->task.local_node, block->id);
 					++REPORT_BUDGET_HIT;
 				}
 			}
@@ -185,7 +189,7 @@ void mapper(long id)
 		bcpu = clock;
 		node_cpu(node, SETUP_COMPUTATION_TIME);
 		cpu_t = abs(clock - bcpu);
-		T_TASK_TIMES[O_CPU]->record(cpu_t);
+//		T_TASK_TIMES[O_CPU]->record(cpu_t);
 		REPORT_CPU_T.first += cpu_t;
 		REPORT_CPU_T.second++;
 
@@ -211,35 +215,36 @@ void mapper(long id)
 			// complete job
 			job->time.end = clock;
 			double turnaround_t = abs(job->time.end - job->time.begin);
-			T_TURNAROUND_TIME->record(turnaround_t);
-			T_QDELAY_TIME->record(job->time.qtotal);
+//			T_TURNAROUND_TIME->record(turnaround_t);
+//			T_QDELAY_TIME->record(job->time.qtotal);
 			REPORT_RESP_T_TOTAL += turnaround_t;
 			++REPORT_RESP_T_COUNT;
 			REPORT_Q_DELAY_T_TOTAL += job->time.qtotal;
 			++REPORT_Q_DELAY_T_COUNT;
 			JOB_MAP.RemoveKey(job->id);
+			USER_COUNT--;
 			delete job;
 		}
 
 		if (node >= CS_NODE_NUM) {
 			++REPORT_LOCALITY[locality];
-			T_LOCALITY[locality]->record(1.0);
+//			T_LOCALITY[locality]->record(1.0);
 		}
 		--REMAIN_MAP_TASKS;
 
-		T_TASK_TIMES[O_MEMORY]->record(mem_t);
+//		T_TASK_TIMES[O_MEMORY]->record(mem_t);
 		REPORT_MEM_T.first += mem_t;
 		REPORT_MEM_T.second++;
 
-		T_TASK_TIMES[O_DISK]->record(disk_t);
+//		T_TASK_TIMES[O_DISK]->record(disk_t);
 		REPORT_DISK_T.first += disk_t;
 		REPORT_DISK_T.second++;
 
-		T_TASK_TIMES[O_QDELAY]->record(q_t);
+//		T_TASK_TIMES[O_QDELAY]->record(q_t);
 		REPORT_TASK_Q_T.first += q_t;
 		REPORT_TASK_Q_T.second++;
 
-		T_TASK_TIMES[O_NETWORK]->record(net_t);
+//		T_TASK_TIMES[O_NETWORK]->record(net_t);
 		REPORT_NETWORK_T.first += net_t;
 		REPORT_NETWORK_T.second++;
 

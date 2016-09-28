@@ -4,7 +4,7 @@ long MAX_FILE_ID, MAX_BLOCK_ID;
 CAtlMap<long, block_t*> BLOCK_MAP;
 CAtlMap<long, file_t*> FILE_MAP;
 CAtlArray<file_t*> FILE_VEC[MOD_FACTOR];
-CAtlMap<long, CAtlList<std::pair<double, long>>> FILE_HISTORY;
+CAtlMap<long, CAtlMap<double, long>> FILE_HISTORY;
 
 extern long SETUP_TIME_WINDOW, SETUP_FILE_SIZE, SETUP_MODE_TYPE, SETUP_LIMIT_K;
 extern long MANAGER_BAG_SIZE;
@@ -29,18 +29,20 @@ void gen_file(void)
 		if (fd == NULL) exit(EXIT_FAILURE);
 		while (EOF != fscanf(fd, "%ld%lf%lf%ld%ld%ld%ld", &job_id, &gen_t, &hold_t, &maps, &shuffles, &reduces, &file_id)) {
 			if (FILE_MAP.Lookup(file_id) != NULL) continue;
-			maps = ceil((double)maps * SETUP_DATA_SKEW);
+			//maps = ceil((double)maps * SETUP_DATA_SKEW);
 			if (maps > 0) {
 				f = new file_t;
 				f->id = file_id;
 				f->acc.RemoveAll();
+
+				bool dist = (prob() < 1 - SETUP_DATA_LAYOUT);
 
 				for (i = 0; i < maps; ++i) {
 					b = BLOCK_MAP[MAX_BLOCK_ID] = new block_t;
 					b->id = MAX_BLOCK_ID;
 					b->file_id = f->id;
 
-					g = ((prob() < 1 - SETUP_DATA_LAYOUT)) ? uniform_int(0, CS_RACK_NUM - 1) : ori_g;
+					g = (dist) ? uniform_int(0, CS_RACK_NUM - 1) : ori_g;
 
 					min = g * NODE_NUM_IN_RACK;
 					max = min + NODE_NUM_IN_RACK - 1;
@@ -65,14 +67,14 @@ void gen_file(void)
 						RACKS[GET_RACK_FROM_NODE(node)].blocks[b->id] = 1;
 					}
 					f->blocks.Add(b);
-					MAX_BLOCK_ID = MAX_BLOCK_ID + 1;
+					MAX_BLOCK_ID++;
 				}
 				f->size = maps;
 
 				FILE_MAP[f->id] = f;
 				FILE_VEC[f->id % MOD_FACTOR].Add(f);
 				sum = sum + maps;
-				MAX_FILE_ID = MAX_FILE_ID + 1;
+				MAX_FILE_ID++;
 				if (++ori_g == CS_RACK_NUM) ori_g = 0;
 			}
 		}
@@ -84,12 +86,14 @@ void gen_file(void)
 			f->id = MAX_FILE_ID;
 			f->acc.RemoveAll();
 
+			bool dist = (prob() < 1 - SETUP_DATA_LAYOUT);
+
 			for (i = 0; i < SETUP_FILE_SIZE; ++i) {
 				b = BLOCK_MAP[MAX_BLOCK_ID] = new block_t;
 				b->id = MAX_BLOCK_ID;
 				b->file_id = f->id;
 
-				g = ((prob() < 1 - SETUP_DATA_LAYOUT)) ? uniform_int(0, CS_RACK_NUM - 1) : ori_g;
+				g = (dist) ? uniform_int(0, CS_RACK_NUM - 1) : ori_g;
 
 				min = g * NODE_NUM_IN_RACK;
 				max = min + NODE_NUM_IN_RACK - 1;
@@ -149,26 +153,26 @@ long_map_t* GetPopularBlockList(long *top_k)
 		}
 	}
 
+	CAtlList<std::pair<long, double>> remove_history;
+
 	for (mpos = FILE_HISTORY.GetStartPosition(); 
 		mpos != NULL; 
 		FILE_HISTORY.GetNext(mpos)) {
-		CAtlMap<long, CAtlList<std::pair<double, long>>>::CPair *mpair = FILE_HISTORY.GetAt(mpos);
+		CAtlMap<long, CAtlMap<double, long>>::CPair *mpair = FILE_HISTORY.GetAt(mpos);
 		file = FILE_MAP[mpair->m_key];
-		for (lpos = mpair->m_value.GetHeadPosition(); lpos != NULL; NULL) {
-			std::pair<double, long> lpair = mpair->m_value.GetAt(lpos);
-			if (lpair.first < prevt) {
-				POSITION rpos = lpos;
-				mpair->m_value.GetNext(lpos);
-				mpair->m_value.RemoveAt(rpos);
+		for (lpos = mpair->m_value.GetStartPosition(); lpos != NULL; mpair->m_value.GetNext(lpos)) {
+			CAtlMap<double, long >::CPair *lpair = mpair->m_value.GetAt(lpos);
+			if (lpair->m_key < prevt) {
+				std::pair<long, double> p(mpair->m_key, lpair->m_key);
+				remove_history.AddTail(p);
 			}
 			else {
-				acc = lpair.second;
+				acc = lpair->m_value;
 				if (acc > max)
 					max = acc;
 
 				if (SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) {
-					//req = MIN(acc, SETUP_LIMIT_K) - 1;
-					req = acc - 1;
+					req = MIN(acc, SETUP_LIMIT_K) - 1;
 				}
 				else if (SETUP_MODE_TYPE == MODE_IPACS) {
 					req = MIN(acc, REPLICATION_FACTOR) - 1;
@@ -176,10 +180,19 @@ long_map_t* GetPopularBlockList(long *top_k)
 
 				if (fmax[file->id] < req)
 					fmax[file->id] = req;
-				mpair->m_value.GetNext(lpos);
+				//mpair->m_value.GetNext(lpos);
 			}
 		}
 	}
+
+	for (POSITION pr = remove_history.GetHeadPosition();
+		pr != NULL; remove_history.GetNext(pr)) {
+		std::pair<long, double > rp = remove_history.GetAt(pr);
+		FILE_HISTORY[rp.first].RemoveKey(rp.second);
+		if (FILE_HISTORY[rp.first].IsEmpty())
+			FILE_HISTORY.RemoveKey(rp.first);
+	}
+	remove_history.RemoveAll();
 
 	for (fpos = fmax.GetStartPosition(); 
 		fpos != NULL; 
@@ -199,7 +212,9 @@ long_map_t* GetPopularBlockList(long *top_k)
 				(*bag)[block->id] = fpair->m_value;
 			}
 			else if (SETUP_MODE_TYPE == MODE_IPACS) {
-				(*bag)[block->id] = max;
+				//max = MIN(REPLICATION_FACTOR - 1, max);
+				//(*bag)[block->id] = max;
+				(*bag)[block->id] = fpair->m_value;
 			}
 		}
 	}

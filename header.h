@@ -32,9 +32,10 @@ void mem_caching(long nid, long bid);
 void node_cpu(long id, double t);
 void node_mem(long id, long n);
 void node_disk(long id, long n);
-void bblock_use(long nid, long bid);
-void bblock_add(long nid, long bid);
-void bblock_del(long nid, long bid);
+//void bblock_use(long nid, long bid);
+//void bblock_add(long nid, long bid);
+//void bblock_del(long nid, long bid);
+void transfer_blocks_to_budget(long id);
 
 // rack.cpp
 void init_rack(void);
