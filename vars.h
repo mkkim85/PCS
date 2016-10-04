@@ -15,6 +15,7 @@
 // node
 #define CS_NODE_NUM				400
 #define NODE_NUM 				(long)(CS_NODE_NUM * REPLICATION_FACTOR)
+//#define NODE_NUM 				1296//(long)(CS_NODE_NUM * REPLICATION_FACTOR)
 #define NODE_U_POWER			0.3			// ACTIVATE
 #define NODE_D_POWER			0.3			// DEACTIVATE
 #define NODE_S_POWER			0			// STANDBY
@@ -35,6 +36,7 @@
 // rack
 #define CS_RACK_NUM				25
 #define RACK_NUM				(long)(CS_RACK_NUM * REPLICATION_FACTOR)
+//#define RACK_NUM				81//(long)(CS_RACK_NUM * REPLICATION_FACTOR)
 #define NODE_NUM_IN_RACK		(long)(NODE_NUM / RACK_NUM)
 #define SWTICH_NUM				(long)(NODE_NUM_IN_RACK)
 //#define RACK_POWER				(4.8 * 0.5)	// default 50% = 2.4 kW
@@ -42,7 +44,7 @@
 #define MASTER_SPEED			0.05
 
 // setup
-#define MAX_PROCESSES			((NODE_NUM - CS_NODE_NUM) + NODE_NUM + MAP_SLOTS_MAX + 7)
+#define MAX_PROCESSES			(NODE_NUM + MAP_SLOTS_MAX + 7)
 #define MAX_FACILITIES			((NODE_NUM * 3) + RACK_NUM + 1)
 #define MAX_SERVERS				((NODE_NUM * 3) + (NODE_NUM * CPU_CORE) + (NODE_NUM * DISK_NUM) + (RACK_NUM * SWTICH_NUM) + 1)
 #define MAX_MAILBOXES			(NODE_NUM + MAP_SLOTS_MAX)
@@ -63,9 +65,14 @@
 //#define COMP_FACTOR				uniform_int(12, 13)
 
 // PPMVC
-#define COMP_T					(64.0 / (30.2 / 8.0))	// 30.2 Mbps
-#define DECOMP_T				(64.0 / (31.4 / 8.0))	// 31.4 Mbps
-#define COMP_FACTOR				uniform_int(26, 27)
+//#define COMP_T					(64.0 / (30.2 / 8.0))	// 30.2 Mbps
+//#define DECOMP_T				(64.0 / (31.4 / 8.0))	// 31.4 Mbps
+//#define COMP_FACTOR				uniform_int(26, 27)
+
+// LZ4
+#define COMP_T					(64.0 / 400) // 400 MB/s
+#define DECOMP_T				(64.0 / 400) // 400 MB/s
+#define COMP_FACTOR				uniform_int(10, 11)
 
 #define FILE_NUM				(DATA_BLOCK_NUM / JOB_MAP_TASK_NUM)
 #define MOD_FACTOR				CS_RACK_NUM

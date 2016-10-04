@@ -67,16 +67,6 @@ void state_manager(void)
 		if (stable == false && UPSET.IsEmpty() && DOWNSET.IsEmpty() && MANAGER_BUDGET_MAP.IsEmpty())
 			stable = true;
 
-		if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC)
-			&& stable == false && MANAGER_BUDGET_MAP.IsEmpty() && !DOWNSET.IsEmpty()) {
-			for (POSITION pos = DOWNSET.GetStartPosition(); pos != NULL; DOWNSET.GetNext(pos)) {
-				long i = DOWNSET.GetKeyAt(pos);
-				msg_t *msg = new msg_t;
-				msg->power = false;
-				M_NODE[i]->send((long)msg);
-			}
-		}
-
 		if (INCOMPLETE_MAP_TASKS_Q.GetCount() >= SETUP_TIME_WINDOW) {
 			m_total -= INCOMPLETE_MAP_TASKS_Q.RemoveHead();
 		}
@@ -141,13 +131,18 @@ void state_manager(void)
 			//	INCOMPLETE_MAP_TASKS_Q.GetNext(pos);
 			//}
 			//m = sum / INCOMPLETE_MAP_TASKS_Q.GetCount();
-			long ccap = ACTIVE_NODE_SET.GetCount() * MAP_SLOTS;
-			if (m > ccap || m < ccap * SETUP_ALPHA) {
+			long nn = ACTIVE_NODE_SET.GetCount();
+			long ccap = nn * MAP_SLOTS;
+			if ((m > ccap && nn < NODE_NUM) 
+				|| (m < ccap * SETUP_ALPHA && nn > CS_NODE_NUM)) {
 				stable = false;
 				req_m = m - (CS_NODE_NUM * MAP_SLOTS);
 				REPORT_REQ_M.first += req_m;
 				REPORT_REQ_M.second++;
 
+				//if (m < ccap * SETUP_ALPHA)	// underload
+				//	bag = new long_map_t;
+				//else bag = GetPopularBlockList(&top_k);
 				bag = GetPopularBlockList(&top_k);
 				bag = FindPCS(MANAGER_CS, bag, req_m);
 				ActivateNodes(MANAGER_CS, bag);
@@ -352,7 +347,6 @@ long_map_t* FindPCS(bool cs[], long_map_t *bag, long req_m)
 void ActivateNodes(bool cs[], long_map_t *bag)
 {
 	long i;
-	msg_t *msg;
 	CAtlList<long> rk;
 	UPSET.RemoveAll();
 	DOWNSET.RemoveAll();
@@ -521,52 +515,22 @@ void ActivateNodes(bool cs[], long_map_t *bag)
 		}
 	}
 	
-	if (SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC) {
-		for (i = CS_NODE_NUM; i < NODE_NUM; ++i)
-		{
-			if (MANAGER_CS[i] == true) {	// turn on nodes
-				if (NODES[i].state == STATE_STANDBY) {
-					//printf("%ld) %ld\n", (long)clock, GET_RACK_FROM_NODE(i));
-					msg = new msg_t;
-					msg->power = true;
-					M_NODE[i]->send((long)msg);
-					UPSET[i] = 1;
-				}
-				else if (MANAGER_BUDGET_MAP.Lookup(i) != NULL) {
-					// transfer budget blocks to already activated nodes
-					transfer_blocks_to_budget(i);
-				}
-			}
-			else {	// turn off nodes
-				if (NODES[i].state == STATE_ACTIVE) {
-					//msg = new msg_t;
-					//msg->power.power = false;
-					//M_NODE[i]->synchronous_send((long)msg);
-					DOWNSET[i] = 1;
-				}
-			}
+	for (i = CS_NODE_NUM; i < NODE_NUM; ++i)
+	{
+		if (MANAGER_CS[i] == true) {	// turn on nodes
+			if (NODES[i].state == STATE_STANDBY)
+				UPSET[i] = 1;
+			//printf("%ld) %ld\n", (long)clock, GET_RACK_FROM_NODE(i));
+			msg_t *msg = new msg_t;
+			msg->node.power = true;
+			M_NODE[i]->send((long)msg);
 		}
-	}
-	else {
-		for (i = CS_NODE_NUM; i < NODE_NUM; ++i)
-		{
-			if (MANAGER_CS[i] == true) {	// turn on nodes
-				if (NODES[i].state == STATE_STANDBY) {
-					//printf("%ld) %ld\n", (long)clock, GET_RACK_FROM_NODE(i));
-					msg = new msg_t;
-					msg->power = true;
-					M_NODE[i]->send((long)msg);
-					UPSET[i] = 1;
-				}
-			}
-			else {	// turn off nodes
-				if (NODES[i].state == STATE_ACTIVE) {
-					msg = new msg_t;
-					msg->power = false;
-					M_NODE[i]->send((long)msg);
-					DOWNSET[i] = 1;
-				}
-			}
+		else {	// turn off nodes
+			if (NODES[i].state == STATE_ACTIVE)
+				DOWNSET[i] = 1;
+			msg_t *msg = new msg_t;
+			msg->node.power = false;
+			M_NODE[i]->send((long)msg);
 		}
 	}
 	delete bag;

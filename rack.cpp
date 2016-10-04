@@ -8,7 +8,6 @@ extern facility *F_MASTER_SWITCH, *F_RACK_SWITCH[RACK_NUM];
 extern long REPORT_RACK_STATE_COUNT[STATE_LENGTH];
 extern long SETUP_MODE_TYPE;
 extern double SETUP_COMPUTATION_TIME, SETUP_RACK_POWER_RATIO, SETUP_RACK_SWITCH_SPEED;
-extern long_map_t UPSET, DOWNSET;
 
 void init_rack(void)
 {
@@ -80,25 +79,15 @@ double switch_rack(long from, long to)
 	return clock - begin;
 }
 
-double  switch_rack(long from, long to, double n)
+double switch_rack(long from, long to, double n)
 {	// For budget data transfer
 	double begin = clock;
 	double t = SETUP_RACK_SWITCH_SPEED * n;
 	if (from != to) {
-		F_RACK_SWITCH[from]->reserve();
-		hold(t);
-		F_RACK_SWITCH[from]->release();
-		//F_RACK_SWITCH[from]->use(t);
-
-		F_MASTER_SWITCH->reserve();
-		hold(MASTER_SPEED * n);
-		F_MASTER_SWITCH->release();
-		//F_MASTER_SWITCH->use(MASTER_SPEED * n);
+		F_RACK_SWITCH[from]->use(t);
+		F_MASTER_SWITCH->use(MASTER_SPEED * n);
 	}
-	F_RACK_SWITCH[to]->reserve();
-	hold(t);
-	F_RACK_SWITCH[to]->release();
-	//F_RACK_SWITCH[to]->use(t);
+	F_RACK_SWITCH[to]->use(t);
 
 	return clock - begin;
 }

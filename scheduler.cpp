@@ -11,7 +11,7 @@ extern CAtlMap<long, job_t*> JOB_MAP;
 
 msg_t * scheduler(long node)
 {
-	long i, slotid;
+	long i, slotid = 0;
 	long rack = GET_RACK_FROM_NODE(node);
 	msg_t *msg = NULL;
 	block_t *block;

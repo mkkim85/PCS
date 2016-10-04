@@ -19,7 +19,7 @@ void scenario(void)
 {
 	if (FB_WORKLOAD == false) {
 		create("scenario");
-		
+
 		CHANGE_T = 0;
 		CHG_PERIOD = 2 * HOUR;
 		CUR_INT = SETUP_LOAD_SCENARIO[0];
@@ -55,7 +55,6 @@ void scenario(void)
 void workload(void)
 {
 	if (FB_WORKLOAD == true) {
-		long i, n, max;
 		long job_id, file_id, maps, shuffles, reduces;
 		double sec, gen_t, hold_t;
 		file_t *file;
@@ -68,12 +67,11 @@ void workload(void)
 		}
 
 		create("workload");
-		
-		while (EOF != fscanf(f, "%ld%lf%lf%ld%ld%ld%ld", &job_id, &gen_t, &hold_t, &maps, &shuffles, &reduces, &file_id))
-		{
+
+		while (EOF != fscanf(f, "%ld%lf%lf%ld%ld%ld%ld", &job_id, &gen_t, &hold_t, &maps, &shuffles, &reduces, &file_id)) {
 			hold(hold_t);
 
-			maps = ceil((double)maps * SETUP_DATA_SKEW);
+			maps = (long)ceil((double)maps * SETUP_DATA_SKEW);
 
 			if (maps > 0) {
 				sec = clock;
@@ -88,18 +86,17 @@ void workload(void)
 				job->run_total = 0;
 				job->map_splits.RemoveAll();
 				job->map_cascade.RemoveAll();
-				job->user_id = NULL;
 
 				while (job->map_total < maps) {
 					file = FILE_MAP[file_id];
 
 					for (long i = 0; i < file->blocks.GetCount() && i < maps; i++) {
-						bool *bflag = new bool[file->blocks.GetCount()];
+						CAtlList<long> flag;
 						while (job->map_total < maps) {
 							long bi = uniform_int(0, file->blocks.GetCount() - 1);
-							if (bflag[bi] == true)
+							if (flag.Find(bi) != NULL)
 								continue;
-							bflag[bi] = true;
+							flag.AddTail(bi);
 							block_t *b = file->blocks[bi];
 							POSITION pos = b->local_node.GetHeadPosition();
 							while (pos != NULL) {
@@ -112,7 +109,7 @@ void workload(void)
 							}
 							++job->map_total;
 						}
-						delete bflag;
+						flag.RemoveAll();
 					}
 
 					REMAIN_MAP_TASKS += maps;
@@ -123,19 +120,18 @@ void workload(void)
 					P_QUEUE.Lookup(0)->m_value->AddTail(job->id);
 				}
 			}
-			fclose(f);
-			CSIM_END = true;
 		}
+		fclose(f);
+		CSIM_END = true;
 	}
 	else {
 		long i, n, max, max_tasks, count;
-		double sec;
-		double u, std, t;
+		double sec, u;
 		file_t *file;
 		job_t *job;
 
 		create("workload");
-		
+
 		while (!CSIM_END) {
 			sec = clock;
 			if (sec > CHANGE_T) {
@@ -148,8 +144,8 @@ void workload(void)
 				u = CUR_INT;
 			}
 			count = 0;
-			max_tasks = 9600 * u;
-			long max_users = ceil(MAX_USERS * u);
+			max_tasks = (long)9600 * u;
+			long max_users = (long)ceil(MAX_USERS * u);
 			while (count < max_tasks) {
 				//while (USER_COUNT < max_users) {
 				USER_COUNT++;
@@ -171,12 +167,12 @@ void workload(void)
 					i = uniform_int(0, max);
 					file = FILE_VEC[n][i];
 
-					bool *bflag = new bool[file->blocks.GetCount()];
+					CAtlList<long> flag;
 					while (job->map_total < JOB_MAP_TASK_NUM) {
 						long bi = uniform_int(0, file->blocks.GetCount() - 1);
-						if (bflag[bi] == true)
+						if (flag.Find(bi) != NULL)
 							continue;
-						bflag[bi] = true;
+						flag.AddTail(bi);
 
 						block_t *b = file->blocks[bi];
 						POSITION pos = b->local_node.GetHeadPosition();
@@ -195,7 +191,7 @@ void workload(void)
 						}
 						++job->map_total;
 					}
-					delete bflag;
+					flag.RemoveAll();
 				}
 				count += JOB_MAP_TASK_NUM;
 				REMAIN_MAP_TASKS += JOB_MAP_TASK_NUM;
@@ -206,7 +202,7 @@ void workload(void)
 				P_QUEUE.Lookup(0)->m_value->AddTail(job->id);
 			}
 
-			hold(SETUP_COMPUTATION_TIME + 50.0);
+			hold(SETUP_COMPUTATION_TIME + (1 * MINUTE));
 			//hold(30.0);
 		}
 	}

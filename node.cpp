@@ -106,12 +106,63 @@ void node(long id)
 	while (true) {
 		M_NODE[id]->receive((long*)&r);
 		
-		if (r->power == true && my->state == STATE_STANDBY) {
-			// Copy replications in budget
-			if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC)
-				&& MANAGER_BUDGET_MAP.Lookup(id) != NULL) {
-				transfer_blocks_to_budget(id);
+		if (MANAGER_BUDGET_MAP.Lookup(id) != NULL) {
+			POSITION pos = MANAGER_BUDGET_MAP[id].GetStartPosition();
+			while (pos != NULL) {
+				CAtlMap<long, CAtlList<long>>::CPair *pair = MANAGER_BUDGET_MAP[id].GetAt(pos);
+				if (SETUP_MODE_TYPE == MODE_PCSC) {
+					for (POSITION pos = pair->m_value.GetHeadPosition();
+						pos != NULL; pair->m_value.GetNext(pos)) {
+						block_t *b = GetBlock(pair->m_value.GetAt(pos));
+						while (true) {
+							POSITION rp = b->local_node.GetHeadPosition();
+							long rn = uniform_int(0, b->local_node.GetCount() - 1);
+							while (rn--)
+								b->local_node.GetNext(rp);
+							node_t *pnode = b->local_node.GetAt(rp)->m_value;
+							if (pnode->state == STATE_ACTIVE) {
+								node_cpu(pnode->id, (double)COMP_T);
+								break;
+							}
+						}
+					}
+
+					double size = pair->m_value.GetCount() / (double)COMP_FACTOR;
+					switch_rack(pair->m_key, parent->id, size);
+					node_cpu(id, (double)DECOMP_T * size);	// de-compress
+				}
+				else {
+					switch_rack(pair->m_key, parent->id, pair->m_value.GetCount());
+				}
+				// insert blocks in budget
+				while (!pair->m_value.IsEmpty()) {
+					block_t *b = GetBlock(pair->m_value.RemoveHead());
+					my->space.budget.blocks[b->id] = b;
+					++my->space.budget.used;
+					++my->space.used;
+					if (parent->blocks.Lookup(b->id) == NULL) {
+						parent->blocks[b->id] = 1;
+					}
+					else {
+						++parent->blocks[b->id];
+					}
+					b->local_node.SetAt(id, my); //b->local_node[id] = my;
+					if (b->local_rack.Lookup(rack) == NULL) {
+						b->local_rack.SetAt(rack, 1);//b->local_rack[rack] = 1;
+					}
+					else {
+						b->local_rack.SetAt(rack, b->local_rack.Lookup(rack)->m_value + 1); //++b->local_rack[rack];
+					}
+					//bblock_add(id, b->id);
+					BUDGET_MAP[b->id][id] = 1;
+					++REPORT_BUDGET_SIZE;
+				}
+				MANAGER_BUDGET_MAP[id].GetNext(pos);
 			}
+			MANAGER_BUDGET_MAP.RemoveKey(id);
+		}
+
+		if (r->node.power == true && my->state == STATE_STANDBY) {
 			turnon_rack(rack);
 			--REPORT_NODE_STATE_COUNT[my->state];
 			my->state = STATE_ACTIVATE;
@@ -132,7 +183,10 @@ void node(long id)
 
 			HEARTBEAT.SetAt(id, my);//HEARTBEAT[id] = my;
 		}
-		else if (r->power == false && my->state == STATE_ACTIVE) {
+		else if (r->node.power == false && my->state == STATE_ACTIVE) {
+			while (!MANAGER_BUDGET_MAP.IsEmpty())
+				hold(1.0);
+
 			HEARTBEAT.RemoveKey(id);
 			while (my->mapper.used > 0) { // wait until all work is completed 
 				hold(1.0);
@@ -288,76 +342,3 @@ void node_disk(long id, long n)
 //		budget->RemoveAt(pos);
 //	}
 //}
-
-long inout_cnt = 0;
-
-void transfer_blocks_to_budget(long id)
-{
-	char str[20];
-	long rack = GET_RACK_FROM_NODE(id);
-	long group = GET_G_FROM_RACK(rack);
-	node_t *my = &NODES[id];
-	rack_t *parent = &RACKS[rack];
-
-	sprintf(str, "%ld_%ld", id, last_process_id());
-	create(str);
-	
-	/*double st = clock;
-	printf("[%ld] %ld (in) %ld (bmap_count: %ld)\n", (long)clock, id, ++inout_cnt, MANAGER_BUDGET_MAP.GetCount());*/
-	POSITION pos = MANAGER_BUDGET_MAP[id].GetStartPosition();
-	while (pos != NULL) {
-		CAtlMap<long, CAtlList<long>>::CPair *pair = MANAGER_BUDGET_MAP[id].GetAt(pos);
-		if (SETUP_MODE_TYPE == MODE_PCSC) {
-			for (POSITION pos = pair->m_value.GetHeadPosition();
-				pos != NULL; pair->m_value.GetNext(pos)) {
-				block_t *b = GetBlock(pair->m_value.GetAt(pos));
-				while (true) {
-					POSITION rp = b->local_node.GetHeadPosition();
-					long rn = uniform_int(0, b->local_node.GetCount() - 1);
-					while (rn--)
-						b->local_node.GetNext(rp);
-					node_t *pnode = b->local_node.GetAt(rp)->m_value;
-					if (pnode->state == STATE_ACTIVE) {
-						node_cpu(pnode->id, (double)COMP_T);
-						break;
-					}
-				}
-			}
-
-			double size = pair->m_value.GetCount() / (double)COMP_FACTOR;
-			switch_rack(pair->m_key, parent->id, size);
-			node_cpu(id, (double)DECOMP_T * size);	// de-compress
-		}
-		else {
-			switch_rack(pair->m_key, parent->id, pair->m_value.GetCount());
-		}
-		// insert blocks in budget
-		while (!pair->m_value.IsEmpty()) {
-			block_t *b = GetBlock(pair->m_value.RemoveHead());
-			my->space.budget.blocks[b->id] = b;
-			++my->space.budget.used;
-			++my->space.used;
-			if (parent->blocks.Lookup(b->id) == NULL) {
-				parent->blocks[b->id] = 1;
-			}
-			else {
-				++parent->blocks[b->id];
-			}
-			b->local_node.SetAt(id, my); //b->local_node[id] = my;
-			if (b->local_rack.Lookup(rack) == NULL) {
-				b->local_rack.SetAt(rack, 1);//b->local_rack[rack] = 1;
-			}
-			else {
-				b->local_rack.SetAt(rack, b->local_rack.Lookup(rack)->m_value + 1); //++b->local_rack[rack];
-			}
-			//bblock_add(id, b->id);
-			BUDGET_MAP[b->id][id] = 1;
-			++REPORT_BUDGET_SIZE;
-		}
-		MANAGER_BUDGET_MAP[id].GetNext(pos);
-	}
-	MANAGER_BUDGET_MAP.RemoveKey(id);
-	/*if ((long)clock >= 27207 && id == 866)
-		int stop = 0;*/
-	//printf("[%ld] %ld (out:%ld) %ld (bmap count: %ld)\n", (long)clock, id, (long)(clock - st), --inout_cnt, MANAGER_BUDGET_MAP.GetCount());
-}

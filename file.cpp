@@ -29,20 +29,20 @@ void gen_file(void)
 		if (fd == NULL) exit(EXIT_FAILURE);
 		while (EOF != fscanf(fd, "%ld%lf%lf%ld%ld%ld%ld", &job_id, &gen_t, &hold_t, &maps, &shuffles, &reduces, &file_id)) {
 			if (FILE_MAP.Lookup(file_id) != NULL) continue;
-			//maps = ceil((double)maps * SETUP_DATA_SKEW);
+			maps = ceil((double)maps * SETUP_DATA_SKEW);
 			if (maps > 0) {
 				f = new file_t;
 				f->id = file_id;
 				f->acc.RemoveAll();
 
-				bool dist = (prob() < 1 - SETUP_DATA_LAYOUT);
+				//bool dist = (prob() < 1 - SETUP_DATA_LAYOUT);
 
 				for (i = 0; i < maps; ++i) {
 					b = BLOCK_MAP[MAX_BLOCK_ID] = new block_t;
 					b->id = MAX_BLOCK_ID;
 					b->file_id = f->id;
 
-					g = (dist) ? uniform_int(0, CS_RACK_NUM - 1) : ori_g;
+					g = (prob() < 1 - SETUP_DATA_LAYOUT) ? uniform_int(0, CS_RACK_NUM - 1) : ori_g;
 
 					min = g * NODE_NUM_IN_RACK;
 					max = min + NODE_NUM_IN_RACK - 1;
@@ -86,14 +86,14 @@ void gen_file(void)
 			f->id = MAX_FILE_ID;
 			f->acc.RemoveAll();
 
-			bool dist = (prob() < 1 - SETUP_DATA_LAYOUT);
+			//bool dist = (prob() < 1 - SETUP_DATA_LAYOUT);
 
 			for (i = 0; i < SETUP_FILE_SIZE; ++i) {
 				b = BLOCK_MAP[MAX_BLOCK_ID] = new block_t;
 				b->id = MAX_BLOCK_ID;
 				b->file_id = f->id;
 
-				g = (dist) ? uniform_int(0, CS_RACK_NUM - 1) : ori_g;
+				g = (prob() < 1 - SETUP_DATA_LAYOUT) ? uniform_int(0, CS_RACK_NUM - 1) : ori_g;
 
 				min = g * NODE_NUM_IN_RACK;
 				max = min + NODE_NUM_IN_RACK - 1;
@@ -134,10 +134,10 @@ void gen_file(void)
 long_map_t* GetPopularBlockList(long *top_k)
 {
 	double prevt, curt;
-	long req, acc, max = 0;
+	long req = 0, acc = 0, max = 0;
 	block_t *block;
 	file_t *file;
-	POSITION mpos, lpos, bpos, fpos;
+	POSITION mpos, lpos, fpos;
 	long_map_t *bag = new long_map_t;
 	long_map_t fmax;
 

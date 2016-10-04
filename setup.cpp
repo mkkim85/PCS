@@ -92,8 +92,8 @@ void setup(void)
 	}
 	delete stat_buf;
 
-	//sprintf(str, "_report\\%s.txt", path);
-	//SETUP_SIM_OUTPUT = fopen(str, "w");
+	/*sprintf(str, "_report\\%s.txt", path);
+	SETUP_SIM_OUTPUT = fopen(str, "w");*/
 	sprintf(str, "_report\\%s.csv", path);
 	strcpy(SETUP_REPORT_PATH, str);
 	SETUP_REPORT_FILE = fopen(str, "w");

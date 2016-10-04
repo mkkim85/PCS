@@ -81,7 +81,6 @@ struct file_t
 struct job_t
 {
 	long id;
-	long user_id;
 	long running;
 	long run_total;
 	long map_total;
@@ -97,7 +96,6 @@ struct job_t
 
 union msg_t
 {
-	bool power;
 	struct {
 		long id;
 		LocalTypes locality;
@@ -105,4 +103,7 @@ union msg_t
 		block_t *block;
 		job_t *job;
 	} task;
+	struct {
+		bool power;
+	} node;
 };

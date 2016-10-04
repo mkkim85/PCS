@@ -35,7 +35,7 @@ void node_disk(long id, long n);
 //void bblock_use(long nid, long bid);
 //void bblock_add(long nid, long bid);
 //void bblock_del(long nid, long bid);
-void transfer_blocks_to_budget(long id);
+//void transfer_blocks_to_budget(long id);
 
 // rack.cpp
 void init_rack(void);
