@@ -1,6 +1,7 @@
 #include "header.h"
 
 double ZIPF_PROB[MOD_FACTOR];
+long count[MOD_FACTOR] = { 0, };
 
 extern double SETUP_DATA_SKEW;
 
@@ -26,8 +27,10 @@ long rand_zipf(void)
 
 	for (i = 0; i < MOD_FACTOR; ++i) {
 		if (p < ZIPF_PROB[i]) {
+			count[i]++;
 			return i;
 		}
 	}
+	count[MOD_FACTOR - 1]++;
 	return MOD_FACTOR - 1;
 }

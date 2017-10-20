@@ -5,6 +5,7 @@ CAtlMap<long, block_t*> BLOCK_MAP;
 CAtlMap<long, file_t*> FILE_MAP;
 CAtlArray<file_t*> FILE_VEC[MOD_FACTOR];
 CAtlMap<long, CAtlMap<double, long>> FILE_HISTORY;
+CAtlMap<long, long> BAG_HISTORY;
 
 extern long SETUP_TIME_WINDOW, SETUP_FILE_SIZE, SETUP_MODE_TYPE, SETUP_LIMIT_K;
 extern long MANAGER_BAG_SIZE;
@@ -17,6 +18,7 @@ extern CAtlList<rack_t*> MANAGER_RANK;
 void gen_file(void)
 {
 	long i, j, node, rack, min, max, sum = 0, g, ori_g = 0;
+	long gen_count = 0, gen_limit = FB_BLOCK_NUM / CS_RACK_NUM;
 	block_t *b;
 	file_t *f;
 	FILE_HISTORY.RemoveAll();
@@ -27,15 +29,14 @@ void gen_file(void)
 		double gen_t, hold_t;
 
 		if (fd == NULL) exit(EXIT_FAILURE);
-		while (EOF != fscanf(fd, "%ld%lf%lf%ld%ld%ld%ld", &job_id, &gen_t, &hold_t, &maps, &shuffles, &reduces, &file_id)) {
+		//while (EOF != fscanf(fd, "%ld%lf%lf%ld%ld%ld%ld", &job_id, &gen_t, &hold_t, &maps, &shuffles, &reduces, &file_id)) {
+		while (EOF != fscanf(fd, "%ld%ld", &file_id, &maps)) {
 			if (FILE_MAP.Lookup(file_id) != NULL) continue;
 			maps = ceil((double)maps * SETUP_DATA_SKEW);
 			if (maps > 0) {
 				f = new file_t;
 				f->id = file_id;
 				f->acc.RemoveAll();
-
-				//bool dist = (prob() < 1 - SETUP_DATA_LAYOUT);
 
 				for (i = 0; i < maps; ++i) {
 					b = BLOCK_MAP[MAX_BLOCK_ID] = new block_t;
@@ -68,6 +69,10 @@ void gen_file(void)
 					}
 					f->blocks.Add(b);
 					MAX_BLOCK_ID++;
+					if (++gen_count > gen_limit) {
+						if (++ori_g == CS_RACK_NUM) ori_g = 0;
+						gen_count = 0;
+					}
 				}
 				f->size = maps;
 
@@ -75,7 +80,7 @@ void gen_file(void)
 				FILE_VEC[f->id % MOD_FACTOR].Add(f);
 				sum = sum + maps;
 				MAX_FILE_ID++;
-				if (++ori_g == CS_RACK_NUM) ori_g = 0;
+				//if (++ori_g == CS_RACK_NUM) ori_g = 0;
 			}
 		}
 		fclose(fd);
@@ -168,6 +173,12 @@ long_map_t* GetPopularBlockList(long *top_k)
 			}
 			else {
 				acc = lpair->m_value;
+				
+				if (BAG_HISTORY.Lookup(file->id) == NULL)
+					BAG_HISTORY[file->id] = acc;
+				else
+					BAG_HISTORY[file->id] = MAX(BAG_HISTORY[file->id], acc);
+
 				if (acc > max)
 					max = acc;
 

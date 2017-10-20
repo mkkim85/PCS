@@ -1,9 +1,11 @@
+
 // simulation parameters
 //#define REPLICA_LIMIT			INT_MAX		//INT_MAX
 //#define RAND_LAYOUT				false
 #define FB_WORKLOAD				false
 #define FB_PATH					"files/workload.txt"
 #define FB_DATA_PATH			"files/data.txt"
+#define FB_BLOCK_NUM			562234
 #define REPLICATION_FACTOR		3
 //#define MAP_COMPUTATION_TIME	30.0
 #define JOB_MAP_TASK_NUM		64
@@ -72,7 +74,11 @@
 // LZ4
 #define COMP_T					(64.0 / 400) // 400 MB/s
 #define DECOMP_T				(64.0 / 400) // 400 MB/s
-#define COMP_FACTOR				uniform_int(10, 11)
+#define COMP_FACTOR				uniform_int(30, 33)
+// uniform_int(10, 11)
+// uniform_int(30, 33)
+// uniform_int(50, 55)
+// uniform_int(70, 77)
 
 #define FILE_NUM				(DATA_BLOCK_NUM / JOB_MAP_TASK_NUM)
 #define MOD_FACTOR				CS_RACK_NUM

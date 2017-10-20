@@ -7,6 +7,8 @@ double CHANGE_T, CUR_INT, NEXT_INT, CHG_PERIOD;
 CAtlMap<long, job_t*> JOB_MAP;
 CRBMap<long, CAtlList<long>*> P_QUEUE;
 //long long FN[RACK_NUM];
+CAtlMap<long, std::pair<long, long>> HISTO_FILE_ACC;
+long rack_acc[CS_RACK_NUM];
 
 extern bool CSIM_END;
 extern CAtlArray<file_t*> FILE_VEC[MOD_FACTOR];
@@ -88,7 +90,15 @@ void workload(void)
 				job->map_cascade.RemoveAll();
 
 				while (job->map_total < maps) {
-					file = FILE_MAP[file_id];
+					file = FILE_MAP.Lookup(file_id)->m_value;
+
+					if (HISTO_FILE_ACC.Lookup(file_id) == NULL) {
+						HISTO_FILE_ACC[file_id].first = 1;
+						HISTO_FILE_ACC[file_id].second = 0;
+					}
+					else {
+						HISTO_FILE_ACC[file_id].first++;
+					}
 
 					for (long i = 0; i < file->blocks.GetCount() && i < maps; i++) {
 						CAtlList<long> flag;
@@ -108,6 +118,8 @@ void workload(void)
 								b->local_node.GetNext(pos);
 							}
 							++job->map_total;
+							HISTO_FILE_ACC[file_id].second++;
+							rack_acc[b->local_rack.GetKeyAt(b->local_rack.GetHeadPosition())]++;
 						}
 						flag.RemoveAll();
 					}
@@ -122,6 +134,19 @@ void workload(void)
 			}
 		}
 		fclose(f);
+		FILE *f_his = fopen("histo.csv", "w");
+		fprintf(f_his, "file id,number of acc,number of tasks,number of blocks\n");
+		for (POSITION pos = HISTO_FILE_ACC.GetStartPosition(); pos != NULL; HISTO_FILE_ACC.GetNext(pos)) {
+			
+			fprintf(f_his, "%ld,%ld,%ld,%ld\n",
+				HISTO_FILE_ACC.GetAt(pos)->m_key,
+				HISTO_FILE_ACC.GetAt(pos)->m_value.first,
+				HISTO_FILE_ACC.GetAt(pos)->m_value.second,
+				FILE_MAP[HISTO_FILE_ACC.GetAt(pos)->m_key]->size);
+		}
+		for (int i = 0; i < CS_RACK_NUM; i++)
+			fprintf(f_his, "%ld,%ld\n", i, rack_acc[i]);
+		fclose(f_his);
 		CSIM_END = true;
 	}
 	else {

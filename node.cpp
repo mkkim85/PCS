@@ -6,6 +6,8 @@ slot_t MAPPER[MAP_SLOTS_MAX];
 long MAX_MAPPER_ID;
 CAtlList<long> MEMORY[NODE_NUM];
 CAtlMap<long, CAtlMap<long, bool>> BUDGET_MAP;
+double node_turnon_time = 0, budget_tran_time = 0;
+long node_turnon_num = 0, budget_tran_num = 0;
 
 extern rack_t RACKS[RACK_NUM];
 extern double SETUP_BUDGET_RATIO;
@@ -40,9 +42,10 @@ void init_node(void)
 		prack = &RACKS[i / NODE_NUM_IN_RACK];
 		pnode->space.capacity = DISK_SIZE;
 		pnode->space.used = 0;
-		pnode->space.budget.capacity = ceil((BLOCK_MAP.GetCount() / CS_NODE_NUM) * SETUP_BUDGET_RATIO); 
+		pnode->space.budget.capacity = (long)SETUP_BUDGET_RATIO;
+		//pnode->space.budget.capacity = ceil((BLOCK_MAP.GetCount() / CS_NODE_NUM) * SETUP_BUDGET_RATIO); 
 		pnode->space.budget.used = 0;
-//		pnode->space.budget.lru_cache.RemoveAll();
+		//		pnode->space.budget.lru_cache.RemoveAll();
 		pnode->space.disk.capacity = DISK_SIZE - pnode->space.budget.capacity;
 
 		sprintf(str, "nMail%ld", i);
@@ -102,11 +105,13 @@ void node(long id)
 
 	sprintf(str, "node%ld", id);
 	create(str);
-	
+
 	while (true) {
 		M_NODE[id]->receive((long*)&r);
-		
+		double turnon_start = clock;
+
 		if (MANAGER_BUDGET_MAP.Lookup(id) != NULL) {
+			double start_time = clock;
 			POSITION pos = MANAGER_BUDGET_MAP[id].GetStartPosition();
 			while (pos != NULL) {
 				CAtlMap<long, CAtlList<long>>::CPair *pair = MANAGER_BUDGET_MAP[id].GetAt(pos);
@@ -127,7 +132,7 @@ void node(long id)
 						}
 					}
 
-					double size = pair->m_value.GetCount() / (double)COMP_FACTOR;
+					double size = pair->m_value.GetCount() * ((double)COMP_FACTOR / 100);
 					switch_rack(pair->m_key, parent->id, size);
 					node_cpu(id, (double)DECOMP_T * size);	// de-compress
 				}
@@ -160,6 +165,8 @@ void node(long id)
 				MANAGER_BUDGET_MAP[id].GetNext(pos);
 			}
 			MANAGER_BUDGET_MAP.RemoveKey(id);
+			budget_tran_time = budget_tran_time + (clock - start_time);
+			budget_tran_num++;
 		}
 
 		if (r->node.power == true && my->state == STATE_STANDBY) {
@@ -182,6 +189,8 @@ void node(long id)
 				UPSET.RemoveKey(id);
 
 			HEARTBEAT.SetAt(id, my);//HEARTBEAT[id] = my;
+			node_turnon_time = node_turnon_time + (clock - turnon_start);
+			node_turnon_num = node_turnon_num + 1;
 		}
 		else if (r->node.power == false && my->state == STATE_ACTIVE) {
 			while (!MANAGER_BUDGET_MAP.IsEmpty())
@@ -196,12 +205,12 @@ void node(long id)
 			if ((SETUP_MODE_TYPE == MODE_PCS || SETUP_MODE_TYPE == MODE_PCSC)
 				&& !my->space.budget.blocks.IsEmpty()) {	// clear budget
 				POSITION pos = my->space.budget.blocks.GetStartPosition();
-				
+
 				while (pos != NULL) {
 					CAtlMap<long, void*>::CPair *pair = my->space.budget.blocks.GetAt(pos);
 					block_t *b = (block_t*)pair->m_value;
 					b->local_node.RemoveKey(id);
-					if (b->local_rack.Lookup(rack) != NULL && 
+					if (b->local_rack.Lookup(rack) != NULL &&
 						--b->local_rack.Lookup(rack)->m_value == 0) {//if (--b->local_rack[rack] == 0) {
 						b->local_rack.RemoveKey(rack);
 					}
@@ -216,7 +225,7 @@ void node(long id)
 					my->space.budget.blocks.GetNext(pos);
 				}
 				my->space.budget.blocks.RemoveAll();
-//				my->space.budget.lru_cache.RemoveAll();
+				//				my->space.budget.lru_cache.RemoveAll();
 			}
 			my->space.used = my->space.used - my->space.budget.used;
 			my->space.budget.used = 0;
@@ -248,11 +257,11 @@ bool cache_hit(long nid, long bid)
 	CAtlList<long> *mem = &MEMORY[nid];
 
 	if (mem->Find(bid) == NULL) {
-//		T_CACHE_MISS->record(1.0);
+		//		T_CACHE_MISS->record(1.0);
 		return false;
 	}
-//	T_CACHE_HIT->record(1.0);
-	
+	//	T_CACHE_HIT->record(1.0);
+
 	return true;
 }
 
