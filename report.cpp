@@ -18,6 +18,7 @@ extern double SETUP_COMPUTATION_TIME, SETUP_RACK_POWER_RATIO, SETUP_RACK_SWITCH_
 extern long SETUP_REPORT_PERIOD;
 extern char SETUP_REPORT_PATH[];
 extern FILE *SETUP_REPORT_FILE;
+extern node_t NODES[NODE_NUM];
 extern node_map_t ACTIVE_NODE_SET, STANDBY_NODE_SET;
 extern rack_map_t ACTIVE_RACK_SET, STANDBY_RACK_SET;
 extern CAtlMap<long, long> BAG_HISTORY;
@@ -36,30 +37,41 @@ void sim_report(void)
 
 	fprintf(SETUP_REPORT_FILE, "clock,kW,total_kW,kW_npg,total_kW_npg,node,rack,total_resp_t,resp_t_count,avg_resp_t,total_q_delay_t,q_delay_count,avg_q_delay,local_node,local_rack,local_remote,map_tasks,task_t,cpu_t,mem_t,disk_t,net_t,task_q_t,avg_m,active_cap,m/cap,req_m,req_node,budget hit,budget size,top k,budget_tran_t,budget_tran_n\n");
 	fclose(SETUP_REPORT_FILE);
-	FILE *f_rack = fopen("rack_acc.csv", "w");
+	/*FILE *f_rack = fopen("rack_acc.csv", "w");
 	fprintf(f_rack, "clock");
 	for (int i = 0; i < CS_RACK_NUM; i++)
 		fprintf(f_rack, ",rack #%ld", i);
-	fprintf(f_rack, "\n");
+	fprintf(f_rack, "\n");*/
 
 	create("report");
 	
 	while (!CSIM_END) {
 		t = clock;
+		long cs_thread_num = 0;
+		for (int i = 0; i < CS_NODE_NUM; i++)
+			if (NODES[i].state == STATE_ACTIVE)
+				cs_thread_num = cs_thread_num + NODES[i].mapper.used;
+
+		long thread_num = cs_thread_num;
+		for (int i = CS_NODE_NUM; i < NODE_NUM; i++)
+			if (NODES[i].state == STATE_ACTIVE)
+				thread_num = thread_num + NODES[i].mapper.used;
 
 		REPORT_KW = REPORT_KW
 			+ (REPORT_RACK_STATE_COUNT[STATE_ACTIVE] * (SETUP_RACK_POWER_RATIO / HOUR))
 			+ (REPORT_NODE_STATE_COUNT[STATE_STANDBY] * (NODE_S_POWER / HOUR))
 			+ (REPORT_NODE_STATE_COUNT[STATE_ACTIVATE] * (NODE_U_POWER / HOUR))
 			+ (REPORT_NODE_STATE_COUNT[STATE_DEACTIVATE] * (NODE_D_POWER / HOUR))
-			+ (REPORT_NODE_STATE_COUNT[STATE_ACTIVE] * (NODE_A_POWER / HOUR));
+			+ (REPORT_NODE_STATE_COUNT[STATE_ACTIVE] * (NODE_I_POWER / HOUR))
+			+ (thread_num * (SLOT_POWER / HOUR));
 
 		REPORT_KW_NPG = REPORT_KW_NPG
 			+ ((REPORT_RACK_STATE_COUNT[STATE_ACTIVE] - CS_RACK_NUM) * (SETUP_RACK_POWER_RATIO / HOUR))
 			+ (REPORT_NODE_STATE_COUNT[STATE_STANDBY] * (NODE_S_POWER / HOUR))
 			+ (REPORT_NODE_STATE_COUNT[STATE_ACTIVATE] * (NODE_U_POWER / HOUR))
 			+ (REPORT_NODE_STATE_COUNT[STATE_DEACTIVATE] * (NODE_D_POWER / HOUR))
-			+ ((REPORT_NODE_STATE_COUNT[STATE_ACTIVE] - CS_NODE_NUM) * (NODE_A_POWER / HOUR));
+			+ ((REPORT_NODE_STATE_COUNT[STATE_ACTIVE] - CS_NODE_NUM) * (NODE_I_POWER / HOUR))
+			+ ((thread_num - cs_thread_num) * (SLOT_POWER / HOUR));;
 
 		//REPORT_NODE.first += ACTIVE_NODE_SET.GetCount();
 		REPORT_NODE.first += REPORT_NODE_STATE_COUNT[STATE_ACTIVE];;
@@ -70,13 +82,13 @@ void sim_report(void)
 		REPORT_RACK.second++;
 
 		if (t > 0 && (t % hold_t) == 0) {
-			fprintf(f_rack, "%ld,%ld", (long)clock, rack_acc[0]);
+			//fprintf(f_rack, "%ld,%ld", (long)clock, rack_acc[0]);
 			rack_acc[0] = 0;
 			for (int i = 1; i < CS_RACK_NUM; i++) {
-				fprintf(f_rack, ",%ld", rack_acc[i]);
+			//	fprintf(f_rack, ",%ld", rack_acc[i]);
 				rack_acc[i] = 0;
 			}
-			fprintf(f_rack, "\n");
+			//fprintf(f_rack, "\n");
 			//fprintf(ftime, "%ld,%lf,%lf,%lf,%ld,%lf,%lf\n", (long)clock, node_turnon_time / node_turnon_num, budget_tran_time / budget_tran_num, node_turnon_time, node_turnon_num, budget_tran_time, budget_tran_num);
 			/*fprintf(fbag, "%ld,%ld", (long)clock,BAG_HISTORY.GetCount());
 			for (POSITION pos = BAG_HISTORY.GetStartPosition(); pos != NULL; BAG_HISTORY.GetNext(pos)) {

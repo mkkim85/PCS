@@ -2,7 +2,7 @@
 // simulation parameters
 //#define REPLICA_LIMIT			INT_MAX		//INT_MAX
 //#define RAND_LAYOUT				false
-#define FB_WORKLOAD				false
+#define FB_WORKLOAD				true
 #define FB_PATH					"files/workload.txt"
 #define FB_DATA_PATH			"files/data.txt"
 #define FB_BLOCK_NUM			562234
@@ -19,13 +19,15 @@
 #define NODE_NUM 				(long)(CS_NODE_NUM * REPLICATION_FACTOR)
 //#define NODE_NUM 				1296//(long)(CS_NODE_NUM * REPLICATION_FACTOR)
 #define NODE_U_POWER			0.3			// ACTIVATE
-#define NODE_D_POWER			0.3			// DEACTIVATE
+#define NODE_D_POWER			0.2			// DEACTIVATE
 #define NODE_S_POWER			0			// STANDBY
-#define NODE_A_POWER			0.3			// ACTIVE
+#define NODE_P_POWER			0.3			// PEAK POWER
+#define NODE_I_POWER			0.15		// IDLE
 //#define NODE_U_TIME				100.0		// ACTIVATING TIME (sec)
 #define NODE_D_TIME				10.0		// DEACTIVATING TIME (sec)
 #define MAP_SLOTS				8			// HP(Xeon)
 #define MAP_SLOTS_MAX			(long)(NODE_NUM * MAP_SLOTS)
+#define SLOT_POWER				((NODE_P_POWER - NODE_I_POWER) / MAP_SLOTS)
 #define CPU_CORE				(long)(MAP_SLOTS)
 //#define MEMORY_SIZE				128			// 8 GB, 128 blocks
 #define MEMORY_SIZE				30			// 2 GB
@@ -72,13 +74,10 @@
 //#define COMP_FACTOR				uniform_int(26, 27)
 
 // LZ4
-#define COMP_T					(64.0 / 400) // 400 MB/s
-#define DECOMP_T				(64.0 / 400) // 400 MB/s
-#define COMP_FACTOR				uniform_int(30, 33)
-// uniform_int(10, 11)
+#define COMP_T					(64.0 / 400.0) // 400 MB/s
+#define DECOMP_T				(64.0 / 400.0) // 400 MB/s
+#define COMP_FACTOR				0.3
 // uniform_int(30, 33)
-// uniform_int(50, 55)
-// uniform_int(70, 77)
 
 #define FILE_NUM				(DATA_BLOCK_NUM / JOB_MAP_TASK_NUM)
 #define MOD_FACTOR				CS_RACK_NUM

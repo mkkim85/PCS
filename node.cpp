@@ -132,7 +132,8 @@ void node(long id)
 						}
 					}
 
-					double size = pair->m_value.GetCount() * ((double)COMP_FACTOR / 100);
+					double size = pair->m_value.GetCount() * COMP_FACTOR;
+					//double size = pair->m_value.GetCount() * ((double)COMP_FACTOR / 100);
 					switch_rack(pair->m_key, parent->id, size);
 					node_cpu(id, (double)DECOMP_T * size);	// de-compress
 				}

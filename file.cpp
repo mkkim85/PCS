@@ -32,7 +32,7 @@ void gen_file(void)
 		//while (EOF != fscanf(fd, "%ld%lf%lf%ld%ld%ld%ld", &job_id, &gen_t, &hold_t, &maps, &shuffles, &reduces, &file_id)) {
 		while (EOF != fscanf(fd, "%ld%ld", &file_id, &maps)) {
 			if (FILE_MAP.Lookup(file_id) != NULL) continue;
-			maps = ceil((double)maps * SETUP_DATA_SKEW);
+			//maps = ceil((double)maps * SETUP_DATA_SKEW);
 			if (maps > 0) {
 				f = new file_t;
 				f->id = file_id;

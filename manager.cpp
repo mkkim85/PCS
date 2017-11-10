@@ -60,7 +60,7 @@ void state_manager(void)
 	long req_m, top_k = 0;
 	long m_total = 0;
 	long_map_t *bag = NULL;
-	FILE *f_load = fopen("load.csv", "w");
+	//FILE *f_load = fopen("load.csv", "w");
 
 	create("state manager");
 
@@ -74,7 +74,7 @@ void state_manager(void)
 		m_total += REMAIN_MAP_TASKS;
 		INCOMPLETE_MAP_TASKS_Q.AddTail(REMAIN_MAP_TASKS);
 
-		fprintf(f_load, "%ld,%ld\n", (long)clock, REMAIN_MAP_TASKS);
+		//fprintf(f_load, "%ld,%ld\n", (long)clock, REMAIN_MAP_TASKS);
 
 		REPORT_AVG_M.first += (double)m_total / (double)INCOMPLETE_MAP_TASKS_Q.GetCount();
 		REPORT_AVG_M.second++;

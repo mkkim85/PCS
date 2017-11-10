@@ -134,9 +134,9 @@ void workload(void)
 			}
 		}
 		fclose(f);
-		FILE *f_his = fopen("histo.csv", "w");
-		fprintf(f_his, "file id,number of acc,number of tasks,number of blocks\n");
-		for (POSITION pos = HISTO_FILE_ACC.GetStartPosition(); pos != NULL; HISTO_FILE_ACC.GetNext(pos)) {
+		//FILE *f_his = fopen("histo.csv", "w");
+		//fprintf(f_his, "file id,number of acc,number of tasks,number of blocks\n");
+		/*for (POSITION pos = HISTO_FILE_ACC.GetStartPosition(); pos != NULL; HISTO_FILE_ACC.GetNext(pos)) {
 			
 			fprintf(f_his, "%ld,%ld,%ld,%ld\n",
 				HISTO_FILE_ACC.GetAt(pos)->m_key,
@@ -146,7 +146,7 @@ void workload(void)
 		}
 		for (int i = 0; i < CS_RACK_NUM; i++)
 			fprintf(f_his, "%ld,%ld\n", i, rack_acc[i]);
-		fclose(f_his);
+		fclose(f_his);*/
 		CSIM_END = true;
 	}
 	else {
